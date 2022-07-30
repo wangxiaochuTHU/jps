@@ -1,0 +1,23 @@
+[package]
+categories = ["Algorithm","science::robotics"]
+name = "jps"
+version = "0.1.0"
+description = "Jump Point Searching Implementation for Path Finding."
+edition = "2021"
+exclude = [
+  "target/*",
+  ".gitignore",
+  ".cargo/*",
+  ".vscode/*",
+  "Cargo.lock",
+]
+
+keywords = ["3d", "jps", "path-finding","jump-point-search"]
+license = "MIT OR Apache-2.0"
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+nalgebra = {version = "0.31",default-features = false,features = ["libm-force","alloc"]}
+libm = "0.2.2"
+num-traits = {version = "0.2.15", default-features = false}
+itertools = { version = "0.10.3",default-features = false, features = ["use_std"]}
