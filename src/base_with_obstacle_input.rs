@@ -27,7 +27,7 @@ pub fn jps_3d_v2(
     x_max: i32,
     y_max: i32,
     z_max: i32,
-) -> Vec<Grid> {
+) -> Option<Vec<Grid>> {
     let nodestart = Node {
         pos: *map_start,        // index of the point on the grid-map
         id: 0,                  // id records the index of node in closelist
@@ -50,7 +50,6 @@ pub fn jps_3d_v2(
         let (node, _fcost) = openlist.pop().unwrap(); // take the node with the smallest fcost
         for d in node.dir.iter() {
             if let Some(mut nodenew) = jump(occ_set, map_goal, &node.pos, d, x_max, y_max, z_max) {
-                // println!("nodenew = {:?}", nodenew);
                 // when the new grid hasn't been visited, visit it.
                 if !map_visit.contains(&nodenew.pos) {
                     nodenew.fa = node.id;
@@ -60,9 +59,6 @@ pub fn jps_3d_v2(
                     openlist.push((nodenew.clone(), fnew));
                     closelist.push(nodenew.clone());
                     map_visit.insert(nodenew.pos);
-                    // println!("nodenew =  {:?}", nodenew);
-                    // println!("openlist = {:?}", openlist);
-                    // println!("");
 
                     // find the goal
                     if nodenew.pos == *map_goal {
@@ -78,21 +74,24 @@ pub fn jps_3d_v2(
         }
     }
 
-    println!("findgoal = {}", findgoal);
-    let mut path: Vec<Grid> = Vec::new();
-    let mut k = closelist.len() - 1;
+    if findgoal {
+        let mut path: Vec<Grid> = Vec::new();
+        let mut k = closelist.len() - 1;
 
-    // construct the path backwards.
-    while k > 0 {
-        let renode = &closelist[k];
-        path.push(renode.pos);
-        k = renode.fa;
+        // construct the path backwards.
+        while k > 0 {
+            let renode = &closelist[k];
+            path.push(renode.pos);
+            k = renode.fa;
+        }
+        path.push(*map_start);
+        // reverse the path
+        path.reverse();
+
+        Some(path)
+    } else {
+        None
     }
-    path.push(*map_start);
-    // reverse the path
-    path.reverse();
-
-    path
 }
 
 #[allow(unused)]
