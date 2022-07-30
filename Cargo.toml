@@ -1,5 +1,5 @@
 [package]
-categories = ["Algorithm","science::robotics"]
+categories = ["Algorithms","science::robotics"]
 name = "jps"
 version = "0.1.0"
 description = "Jump Point Searching Implementation for Path Finding."
