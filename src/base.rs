@@ -356,42 +356,50 @@ pub fn step(pos: &Grid, d: &Dir) -> Grid {
 }
 
 #[allow(unused)]
-pub fn test_all_dirs() {
-    let o = Grid::new(0, 0, 0);
-    for x in -1..2 {
-        for y in -1..2 {
-            for z in -1..2 {
-                let p = Grid::new(x, y, z);
-                let dir = o - p;
-                if dir.dot(&dir) == 0 {
-                    continue;
+mod tests {
+    use super::dir_2dto1d;
+    use crate::linalg::{OVector, U3};
+    use crate::{jps_3d_v1, Dir, Grid};
+    use std::collections::HashSet;
+    #[allow(unused)]
+    pub fn test_all_dirs() {
+        let o = Grid::new(0, 0, 0);
+        for x in -1..2 {
+            for y in -1..2 {
+                for z in -1..2 {
+                    let p = Grid::new(x, y, z);
+                    let dir = o - p;
+                    if dir.dot(&dir) == 0 {
+                        continue;
+                    }
+                    println!("Dir::new({},{},{}),", dir[0], dir[1], dir[2]);
                 }
-                println!("Dir::new({},{},{}),", dir[0], dir[1], dir[2]);
             }
         }
     }
-}
 
-pub fn test_dir_2dto1d() {
-    let dir = Dir::new(1, 0, -1);
-    println!("{:?}", dir_2dto1d(&dir));
-}
+    pub fn test_dir_2dto1d() {
+        let dir = Dir::new(1, 0, -1);
+        println!("{:?}", dir_2dto1d(&dir));
+    }
 
-pub fn test_jps_3d() {
-    let map = [
-        //↓ start
-        0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1,
-        1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-        1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0,
-        1, 1, 1, 0, //# ← goal
-    ];
-    let binary_map: Vec<bool> = map.into_iter().map(|x| x == 1).collect();
-    let map = &binary_map[..];
-    let map_start = Grid::new(0, 0, 0);
-    let map_goal = Grid::new(4, 4, 4);
-    let (x_max, y_max, z_max) = (4, 4, 4);
-    let path = jps_3d_v1(map, &map_start, &map_goal, x_max, y_max, z_max);
+    pub fn test_jps_3d() {
+        let map = [
+            //↓ start
+            0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 1, 1, 1,
+            1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0,
+            0, 0, 0, 0, 0, 1, 1, 1, 0, //# ← goal
+        ];
+        let binary_map: Vec<bool> = map.into_iter().map(|x| x == 1).collect();
+        let map = &binary_map[..];
+        let map_start = Grid::new(0, 0, 0);
+        let map_goal = Grid::new(4, 4, 4);
+        let (x_max, y_max, z_max) = (4, 4, 4);
+        let path = jps_3d_v1(map, &map_start, &map_goal, x_max, y_max, z_max);
 
-    println!("{:?}", path);
+        assert!(path.is_some());
+        println!("{:?}", path.unwrap());
+    }
 }

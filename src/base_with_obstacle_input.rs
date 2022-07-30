@@ -414,10 +414,7 @@ mod tests {
         let map_goal = Grid::new(4, 4, 4);
         let (x_max, y_max, z_max) = (4, 4, 4);
         let path = jps_3d_v2(&occ_set, &map_start, &map_goal, x_max, y_max, z_max);
-
-        println!("{:?}", path);
-
-        let a = OVector::<f32, U3>::new(-1.0, 1.0, 1.0);
-        let b = OVector::<f32, U3>::new(1.0, 1.0, 0.0);
+        assert!(path.is_some());
+        println!("{:?}", path.unwrap());
     }
 }
