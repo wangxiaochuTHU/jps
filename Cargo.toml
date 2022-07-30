@@ -19,6 +19,5 @@ repository = "https://github.com/wangxiaochuTHU/jps"
 
 [dependencies]
 nalgebra = {version = "0.31",default-features = false,features = ["libm-force","alloc"]}
-libm = "0.2.2"
 num-traits = {version = "0.2.15", default-features = false}
 itertools = { version = "0.10.3",default-features = false, features = ["use_std"]}
