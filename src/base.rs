@@ -116,8 +116,8 @@ pub fn jump(
     y_max: i32,
     z_max: i32,
 ) -> Option<Node> {
-    let norm_square_d: u32 = d.into_iter().map(|i| i.pow(2) as u32).sum();
-    if norm_square_d == 0 {
+    let norm_d: u32 = d.into_iter().map(|i| i.abs() as u32).sum();
+    if norm_d == 0 {
         return None;
     }
     let (xdim, ydim, zdim) = (1 + x_max as usize, 1 + y_max as usize, 1 + z_max as usize);
@@ -140,7 +140,7 @@ pub fn jump(
         return Some(newnode);
     }
 
-    if norm_square_d == 2 {
+    if norm_d == 2 {
         let dside = dir_2dto1d(d);
         if is_ob_check(&(startpos + dside[0]), map, xdim, ydim, zdim)
             && is_ob_check(&(startpos + dside[1]), map, xdim, ydim, zdim)
@@ -160,7 +160,7 @@ pub fn jump(
     }
 
     // go 3d diagonal
-    if norm_square_d == 3 {
+    if norm_d == 3 {
         // one 3d-diagonal change three 2d-diagonal + three straght line
         let do6 = [
             Dir::new(0, d[1], d[2]),
@@ -191,7 +191,7 @@ pub fn jump(
     }
 
     // go 2d diagonal
-    if norm_square_d == 2 {
+    if norm_d == 2 {
         let do3 = [
             Dir::new(d[0], 0, 0),
             Dir::new(0, d[1], 0),
@@ -294,10 +294,10 @@ pub fn get_forceneighbour_dirs(
         return dirs;
     }
 
-    let norm_square_d: i32 = d.into_iter().map(|i| i.pow(2) as i32).sum();
+    let norm_d: i32 = d.into_iter().map(|i| i.abs() as i32).sum();
     let (xdim, ydim, zdim) = (1 + x_max as usize, 1 + y_max as usize, 1 + z_max as usize);
     // [go straght]  ----------------------------------------------
-    if norm_square_d == 1 {
+    if norm_d == 1 {
         if is_ob_check(&(pos + d), map, xdim, ydim, zdim) {
             return dirs;
         }
@@ -311,7 +311,7 @@ pub fn get_forceneighbour_dirs(
         }
     }
     // [go 2D-diagonal] ----------------------------------------------
-    else if norm_square_d == 2 {
+    else if norm_d == 2 {
         let dside = dir_2dto1d(d);
         for ds in dside.into_iter() {
             if has_forceneighbour_check(&(pos - ds), &(d - ds), map, x_max, y_max, z_max) {
