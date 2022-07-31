@@ -50,13 +50,6 @@ pub fn jps_3d_v1(
         openlist.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap()); //sort by value in descending order
         let (node, _fcost) = openlist.pop().unwrap(); // take the node with the smallest fcost
         for d in node.dir.iter() {
-            // //debug
-            // if node.pos == Grid::new(1, 3, 4) {
-            //     let aaa = jump(map, map_goal, &node.pos, d, x_max, y_max, z_max);
-            //     println!("d = {:?}, aaa = {:?}", d, aaa);
-            // }
-            // //
-
             if let Some(mut nodenew) = jump(map, map_goal, &node.pos, d, x_max, y_max, z_max) {
                 // when the new grid hasn't been visited, visit it.
                 if !map_visit.contains(&nodenew.pos) {
@@ -160,17 +153,6 @@ pub fn jump(
     let mut dirs = get_forceneighbour_dirs(&newpos, d, map, x_max, y_max, z_max);
     let mut newnode0 = Node::default();
     if dirs.len() > 0 {
-        //debug 1
-        let mut xxx = true;
-        if newpos == Grid::new(1, 3, 4) {
-            println!(
-                "debug [1] 错误---------------------d = {:?}, dirs = {:?}",
-                d, dirs
-            );
-            xxx = false;
-        }
-        //
-
         newnode0 = Node {
             pos: newpos,
             dir: dirs.clone(),
@@ -230,14 +212,6 @@ pub fn jump(
 
         // find a ForceNegihbour
         if dir.len() > 1 {
-            //debug 1
-            if newpos == Grid::new(1, 3, 4) {
-                println!(
-                    "debug [1] 正确---------------------d = {:?}, dirs = {:?}",
-                    d, dir
-                );
-            }
-            //
             dir.append(&mut dirs);
             dir = dir.into_iter().unique().collect();
 
