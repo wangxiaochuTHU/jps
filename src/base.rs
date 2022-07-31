@@ -74,6 +74,7 @@ pub fn jps_3d_v1(
             break;
         }
     }
+
     if findgoal {
         let mut path: Vec<Grid> = Vec::new();
         let mut k = closelist.len() - 1;
@@ -362,7 +363,9 @@ mod tests {
     use crate::{jps_3d_v1, Dir, Grid};
     use std::collections::HashSet;
     #[allow(unused)]
+    #[test]
     pub fn test_all_dirs() {
+        let mut out: Vec<Dir> = Vec::new();
         let o = Grid::new(0, 0, 0);
         for x in -1..2 {
             for y in -1..2 {
@@ -373,24 +376,52 @@ mod tests {
                         continue;
                     }
                     println!("Dir::new({},{},{}),", dir[0], dir[1], dir[2]);
+                    out.push(dir);
                 }
             }
         }
+        assert!(out.len() == 26);
     }
-
+    #[test]
     pub fn test_dir_2dto1d() {
         let dir = Dir::new(1, 0, -1);
-        println!("{:?}", dir_2dto1d(&dir));
+        let subdirs = dir_2dto1d(&dir);
+        println!("{:?}", subdirs);
+        assert!(subdirs[0] + subdirs[1] == dir);
     }
-
+    #[test]
     pub fn test_jps_3d() {
         let map = [
             //↓ start
-            0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1,
-            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 1, 1, 1,
-            1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1,
-            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0,
-            0, 0, 0, 0, 0, 1, 1, 1, 0, //# ← goal
+            0, 1, 1, 1, 1, //
+            0, 1, 1, 1, 1, //
+            0, 1, 1, 1, 1, //
+            0, 1, 1, 1, 1, //
+            0, 1, 1, 1, 1, //
+            //
+            1, 1, 1, 1, 1, //
+            1, 1, 1, 1, 1, //
+            1, 1, 1, 1, 1, //
+            1, 1, 1, 1, 1, //
+            0, 0, 0, 0, 0, //
+            //
+            1, 1, 1, 1, 0, //
+            1, 1, 1, 1, 0, //
+            1, 1, 1, 1, 0, //
+            1, 1, 1, 1, 0, //
+            1, 1, 1, 1, 0, //
+            //
+            0, 0, 0, 0, 0, //
+            1, 1, 1, 1, 1, //
+            1, 1, 1, 1, 1, //
+            1, 1, 1, 1, 1, //
+            1, 1, 1, 1, 1, //
+            //
+            0, 1, 1, 1, 1, //
+            0, 1, 1, 1, 1, //
+            0, 0, 0, 0, 1, //
+            0, 0, 1, 0, 1, //
+            0, 1, 1, 0, 0, //# ← goal
         ];
         let binary_map: Vec<bool> = map.into_iter().map(|x| x == 1).collect();
         let map = &binary_map[..];
