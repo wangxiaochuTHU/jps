@@ -1,5 +1,13 @@
-# jps : Jump Point Search Algorithm Implementation for Path Finding.
-A Rust Implementation of Jump Point Search Algorithm.
+# jps : Jump Point Search in Rust.
+Jump Point Search Algorithm Implementation in Rust.
+
+**NOTE (Very Important)**: 
+
+This Crate currently has bugs such that it would only work in some special scenes that require plenties of grids with force neighbors due to the incomplete recursion. So DON'T use it for important work. Next I will take time to read the C++ version and try to follow it.
+
+
+
+
 
 # Current implementation status
 

@@ -50,6 +50,13 @@ pub fn jps_3d_v1(
         openlist.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap()); //sort by value in descending order
         let (node, _fcost) = openlist.pop().unwrap(); // take the node with the smallest fcost
         for d in node.dir.iter() {
+            // //debug
+            // if node.pos == Grid::new(1, 3, 4) {
+            //     let aaa = jump(map, map_goal, &node.pos, d, x_max, y_max, z_max);
+            //     println!("d = {:?}, aaa = {:?}", d, aaa);
+            // }
+            // //
+
             if let Some(mut nodenew) = jump(map, map_goal, &node.pos, d, x_max, y_max, z_max) {
                 // when the new grid hasn't been visited, visit it.
                 if !map_visit.contains(&nodenew.pos) {
@@ -75,7 +82,7 @@ pub fn jps_3d_v1(
         }
     }
 
-    if findgoal {
+    if true {
         let mut path: Vec<Grid> = Vec::new();
         let mut k = closelist.len() - 1;
 
@@ -151,13 +158,25 @@ pub fn jump(
     }
 
     let mut dirs = get_forceneighbour_dirs(&newpos, d, map, x_max, y_max, z_max);
+    let mut newnode0 = Node::default();
     if dirs.len() > 0 {
-        let newnode = Node {
+        //debug 1
+        let mut xxx = true;
+        if newpos == Grid::new(1, 3, 4) {
+            println!(
+                "debug [1] 错误---------------------d = {:?}, dirs = {:?}",
+                d, dirs
+            );
+            xxx = false;
+        }
+        //
+
+        newnode0 = Node {
             pos: newpos,
-            dir: dirs,
+            dir: dirs.clone(),
             ..Default::default()
         };
-        return Some(newnode);
+        // return Some(newnode);
     }
 
     // go 3d diagonal
@@ -182,6 +201,9 @@ pub fn jump(
 
         // find a ForceNegihbour
         if dir.len() > 1 {
+            // let mut dirsc = dirs.clone();
+            dir.append(&mut dirs);
+            dir = dir.into_iter().unique().collect();
             let newnode = Node {
                 pos: newpos,
                 dir: dir,
@@ -208,6 +230,17 @@ pub fn jump(
 
         // find a ForceNegihbour
         if dir.len() > 1 {
+            //debug 1
+            if newpos == Grid::new(1, 3, 4) {
+                println!(
+                    "debug [1] 正确---------------------d = {:?}, dirs = {:?}",
+                    d, dir
+                );
+            }
+            //
+            dir.append(&mut dirs);
+            dir = dir.into_iter().unique().collect();
+
             let newnode = Node {
                 pos: newpos,
                 dir: dir,
@@ -215,6 +248,9 @@ pub fn jump(
             };
             return Some(newnode);
         }
+    }
+    if dirs.len() > 0 {
+        return Some(newnode0);
     }
 
     // [go straght] or [go diagonal not find ForceNegihbour]
@@ -280,6 +316,19 @@ pub fn has_forceneighbour_check(
         return false;
     }
     true
+}
+
+pub fn modify(pos: &Grid, d: &Dir, map: &[bool], x_max: i32, y_max: i32, z_max: i32) -> bool {
+    let (xdim, ydim, zdim) = (1 + x_max as usize, 1 + y_max as usize, 1 + z_max as usize);
+    let pos_nb = pos + d;
+    if !is_outmap_check(pos, x_max, y_max, z_max)
+        && is_ob_check(pos, map, xdim, ydim, zdim)
+        && is_outmap_check(&pos_nb, x_max, y_max, z_max)
+        && !is_ob_check(&pos_nb, map, xdim, ydim, zdim)
+    {
+        return true;
+    }
+    false
 }
 
 pub fn get_forceneighbour_dirs(
@@ -363,7 +412,7 @@ mod tests {
     use crate::{jps_3d_v1, Dir, Grid};
     use std::collections::HashSet;
     #[allow(unused)]
-    #[test]
+    // #[test]
     pub fn test_all_dirs() {
         let mut out: Vec<Dir> = Vec::new();
         let o = Grid::new(0, 0, 0);
@@ -382,7 +431,7 @@ mod tests {
         }
         assert!(out.len() == 26);
     }
-    #[test]
+    // #[test]
     pub fn test_dir_2dto1d() {
         let dir = Dir::new(1, 0, -1);
         let subdirs = dir_2dto1d(&dir);
@@ -419,8 +468,8 @@ mod tests {
             //
             0, 1, 1, 1, 1, //
             0, 1, 1, 1, 1, //
+            0, 1, 0, 0, 1, //
             0, 0, 0, 0, 1, //
-            0, 0, 1, 0, 1, //
             0, 1, 1, 0, 0, //# ← goal
         ];
         let binary_map: Vec<bool> = map.into_iter().map(|x| x == 1).collect();

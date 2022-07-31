@@ -361,7 +361,7 @@ mod tests {
     use crate::{jps_3d_v2, Dir, Grid};
     use std::collections::HashSet;
 
-    #[test]
+    // #[test]
     #[allow(unused)]
     pub fn test_all_dirs() {
         let mut out: Vec<Dir> = Vec::new();
@@ -381,7 +381,7 @@ mod tests {
         }
         assert!(out.len() == 26);
     }
-    #[test]
+    // #[test]
     pub fn test_dir_2dto1d() {
         let dir = Dir::new(1, 0, -1);
         let subdirs = dir_2dto1d(&dir);
