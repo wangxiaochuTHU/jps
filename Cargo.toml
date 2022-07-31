@@ -2,7 +2,7 @@
 categories = ["Algorithms","science::robotics"]
 name = "jps"
 version = "0.1.0"
-description = "Jump Point Searching Implementation for Path Finding."
+description = "Jump Point Search Implementation for Path Finding."
 edition = "2021"
 exclude = [
   "target/*",

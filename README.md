@@ -1,5 +1,5 @@
-# jps : Jump Point Searching Algorithm Implementation for Path Finding.
-A Rust Implementation of Jump Point Searching Algorithm.
+# jps : Jump Point Search Algorithm Implementation for Path Finding.
+A Rust Implementation of Jump Point Search Algorithm.
 
 # Current implementation status
 
