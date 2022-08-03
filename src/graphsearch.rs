@@ -7,6 +7,22 @@ use std::cmp::Reverse;
 use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Default)]
+/// `GraphSearch` is the struct type for path finding.
+///
+/// `pq_` :  a Priorty Queue for saving possible nodes.
+///
+/// `hm_` :  a HashMap for saving nodes that have been visited.
+///
+/// `path_`: the path in reverse order, i.e. from goal to start.
+///
+///  `ns_` : all neighbors in terms of relative position.
+///
+///  `jn3d_`: all jps neighbors.
+///
+///  `fmap_`: HashSet containing all free grids.
+///
+///  `omap` : HashSet containing all occupied grids.
+///
 pub struct GraphSearch {
     pub pq_: PriorityQueue<State, Reverse<OrderedFloat<f32>>>,
 
@@ -36,13 +52,20 @@ pub struct GraphSearch {
     pub use_jps_: bool,
 }
 impl GraphSearch {
-    /// create a `GraphSearch` instance, with maps given in term of HashMap.
+    /// create a `GraphSearch` instance, with maps given in terms of HashMap.
+    ///
     /// `fmap_` : free map, containing all coordinates of free grids.
+    ///
     /// `omap_` : occupied map, containing all coordinates of occupied grids.
+    ///
     /// `xdim`  : upper boundary on x-axis.
+    ///
     /// `ydim`  : upper boundary on y-axis.
+    ///
     /// `zdim`  : upper boundary on z-axis.
+    ///
     /// `eps_`  : a scalar in calculating the costs.
+    ///
     pub fn new_v1(
         fmap_: HashSet<(i32, i32, i32)>,
         omap_: HashSet<(i32, i32, i32)>,
@@ -53,11 +76,24 @@ impl GraphSearch {
         // goal: (i32, i32, i32),
         // use_jps_: bool,
     ) -> Self {
+        // Set 3D neighbors
+        let mut ns: Vector<(i32, i32, i32)> = Vector::new();
+        for x in -1..2 {
+            for y in -1..2 {
+                for z in -1..2 {
+                    if x == 0 && y == 0 && z == 0 {
+                        continue;
+                    }
+                    ns.push_back((x, y, z));
+                }
+            }
+        }
+
         Self {
             pq_: PriorityQueue::default(),
             hm_: HashMap::default(),
             path_: Vector::default(),
-            ns_: Vector::default(),
+            ns_: ns,
             jn3d_: JPS3DNeib::default(),
             fmap_: fmap_,
             omap_: omap_,
@@ -70,12 +106,18 @@ impl GraphSearch {
         }
     }
 
-    ///  create a `GraphSearch` instance, with the map given in term of binary-valued array.
+    ///  create a `GraphSearch` instance, with the map given in terms of binary-valued array.
+    ///
     /// `map`   : the map that is reshaped into 1d array, `true` means occupied, `false` means free.
+    ///
     /// `xdim`  : upper boundary on x-axis.
+    ///
     /// `ydim`  : upper boundary on y-axis.
+    ///
     /// `zdim`  : upper boundary on z-axis.
+    ///
     /// `eps_`  : a scalar in calculating the costs.
+    ///
     pub fn new_v2(
         map: &[bool],
         xdim: i32,
@@ -123,10 +165,15 @@ impl GraphSearch {
     }
     #[allow(unused)]
     /// the main entry for planning.
+    ///
     /// `start` : starting grid
+    ///
     /// `goal`  : goal grid
+    ///
     /// `usejps`: `true` for using jps, `false` for using `A*`
+    ///
     /// `max_expand` : max number of the depth in searching.  
+    ///
     pub fn plan_main(
         &mut self,
         start: (i32, i32, i32),
@@ -424,7 +471,7 @@ impl GraphSearch {
     }
 
     #[inline]
-    pub fn is_occupied(&self, pos: &(i32, i32, i32)) -> bool {
+    pub(crate) fn is_occupied(&self, pos: &(i32, i32, i32)) -> bool {
         pos.0 >= 0
             && pos.0 < self.xdim
             && pos.1 >= 0
