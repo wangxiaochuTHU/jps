@@ -6,6 +6,8 @@ Jump Point Search Algorithm Implementation in Rust.
 
 ## JPS Implementation
 * 3D case✅ 
+## Lifetime 
+**Currently no lifetime notation is used, and hence a few unnecessary copies have to be performed. Lifetime is needed to be considered for improving the speed/efficiency**
 
 # Usage
 Add this to your Cargo.toml:
