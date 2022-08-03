@@ -1,7 +1,7 @@
 [package]
 categories = ["Algorithms","science::robotics"]
 name = "jps"
-version = "1.0.1"
+version = "1.0.2"
 description = "Jump Point Search Implementation for Path Finding."
 edition = "2021"
 exclude = [
