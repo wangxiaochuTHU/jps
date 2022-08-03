@@ -1,459 +1,871 @@
-use crate::linalg::{OVector, U3};
-use itertools::Itertools;
-use std::collections::HashSet;
+use ordered_float::OrderedFloat;
+use std::f32::INFINITY;
 
-pub type Grid = OVector<i32, U3>;
-pub type Dir = OVector<i32, U3>;
-use super::constant::ALL_DIRS;
-
-#[derive(Debug, Default, Clone)]
-pub struct Node {
-    pub pos: Grid,
-    pub id: usize,
-    pub fa: usize,
-    pub dir: Vec<Dir>,
+/// Node of the graph in graph search
+#[derive(Debug, Hash, Eq, PartialEq, Copy, Clone)]
+pub struct State {
+    /// ID
+    pub id: (i32, i32, i32),
+    ///Coord
+    pub x: i32,
+    pub y: i32,
+    pub z: i32,
+    /// direction
+    pub dx: i32,
+    pub dy: i32,
+    pub dz: i32,
+    /// id of predicessors
+    pub parent_id: Option<(i32, i32, i32)>,
+    /// g cost
+    pub g: OrderedFloat<f32>,
+    /// heuristic cost
+    pub h: OrderedFloat<f32>,
+    /// if has been opened
+    pub opened: bool,
+    /// if has been closed
+    pub closed: bool,
+}
+impl Default for State {
+    fn default() -> Self {
+        Self {
+            id: (0, 0, 0),
+            x: 0,
+            y: 0,
+            z: 0,
+            dx: 0,
+            dy: 0,
+            dz: 0,
+            parent_id: None,
+            g: OrderedFloat(INFINITY),
+            h: OrderedFloat(INFINITY),
+            opened: false,
+            closed: false,
+        }
+    }
 }
 
-/// main entry of the jump point searching algorithm
-/// suppose the `map` is 0-1 binary encoded array. for example, a 3×3×3 map is a 27-length array. 0 means free, 1 means occupied.
-/// i.e. one can indexing (x,y,z) by `idx = x + y * xdim + z * xdim * ydim`, where `xdim` means the number of grids on x-axis.
-/// `x_max` means the maximum on x-axis.
-/// `map_start` is the starting grid on the grid map
-/// `map_goal` is the goal on the grid map.
+impl State {
+    pub fn new(id: (i32, i32, i32), x: i32, y: i32, z: i32, dx: i32, dy: i32, dz: i32) -> Self {
+        Self {
+            id: id,
+            x: x,
+            y: y,
+            z: z,
+            dx: dx,
+            dy: dy,
+            dz: dz,
+            ..Default::default()
+        }
+    }
+}
 
-pub fn jps_3d_v1(
-    map: &[bool],
-    map_start: &Grid,
-    map_goal: &Grid,
-    x_max: i32,
-    y_max: i32,
-    z_max: i32,
-) -> Option<Vec<Grid>> {
-    let nodestart = Node {
-        pos: *map_start,        // index of the point on the grid-map
-        id: 0,                  // id records the index of node in closelist
-        fa: 0,                  // fa records the index of the parent node in the closelist
-        dir: ALL_DIRS.to_vec(), // searching directions
-    };
-    let mut map_visit: HashSet<Grid> = HashSet::new(); // map that has been visited
+#[derive(Debug)]
+/// Search and prune neighbors for JPS 3D
+pub struct JPS3DNeib {
+    // for each (dx,dy,dz) these contain:
+    //    ns: neighbors that are always added
+    //    f1: forced neighbors to check
+    //    f2: neighbors to add if f1 is forced
+    pub ns: [[[i32; 26]; 3]; 27],
+    pub f1: [[[i32; 12]; 3]; 27],
+    pub f2: [[[i32; 12]; 3]; 27],
+}
 
-    /* openlist has tuple elements, i.e.  (node, fcost)
-    where fcost = gn(EuclideanDistance) + hn(ManhattanDistance) */
-    let mut openlist = vec![(nodestart.clone(), 0.0)];
-    let mut closelist = vec![nodestart];
-
-    map_visit.insert(*map_start);
-
-    let mut findgoal = false;
-
-    while openlist.len() > 0 {
-        openlist.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap()); //sort by value in descending order
-        let (node, _fcost) = openlist.pop().unwrap(); // take the node with the smallest fcost
-        for d in node.dir.iter() {
-            if let Some(mut nodenew) = jump(map, map_goal, &node.pos, d, x_max, y_max, z_max) {
-                // when the new grid hasn't been visited, visit it.
-                if !map_visit.contains(&nodenew.pos) {
-                    nodenew.fa = node.id;
-                    nodenew.id = closelist.len();
-                    let fnew = manhattan_distance(map_goal, &nodenew.pos)
-                        + euclidean_distance(&node.pos, &nodenew.pos);
-                    openlist.push((nodenew.clone(), fnew));
-                    closelist.push(nodenew.clone());
-                    map_visit.insert(nodenew.pos);
-
-                    // find the goal
-                    if nodenew.pos == *map_goal {
-                        findgoal = true;
-                        break;
+impl Default for JPS3DNeib {
+    fn default() -> Self {
+        let mut jps3dneib = Self {
+            ns: [[[0; 26]; 3]; 27],
+            f1: [[[0; 12]; 3]; 27],
+            f2: [[[0; 12]; 3]; 27],
+        };
+        let mut id: usize = 0;
+        for dz in -1..2_i32 {
+            for dy in -1..2_i32 {
+                for dx in -1..2_i32 {
+                    let norm1 = dx.abs() + dy.abs() + dz.abs();
+                    for dev in 0..Self::nsz[norm1 as usize][0] {
+                        JPS3DNeib::Neib(dx, dy, dz, norm1, dev, id, &mut jps3dneib.ns);
                     }
+                    for dev in 0..Self::nsz[norm1 as usize][1] {
+                        JPS3DNeib::FNeib(
+                            dx,
+                            dy,
+                            dz,
+                            norm1,
+                            dev,
+                            id,
+                            &mut jps3dneib.f1,
+                            &mut jps3dneib.f2,
+                        );
+                    }
+                    id += 1;
                 }
             }
         }
-        // find the goal
-        if findgoal {
-            break;
-        }
-    }
-
-    if true {
-        let mut path: Vec<Grid> = Vec::new();
-        let mut k = closelist.len() - 1;
-
-        // construct the path backwards.
-        while k > 0 {
-            let renode = &closelist[k];
-            path.push(renode.pos);
-            k = renode.fa;
-        }
-        path.push(*map_start);
-        // reverse the path
-        path.reverse();
-
-        Some(path)
-    } else {
-        None
+        jps3dneib
     }
 }
 
-#[allow(unused)]
-pub fn euclidean_distance(pos1: &Grid, pos2: &Grid) -> f32 {
-    let d = pos1 - pos2;
-    d.into_iter().map(|i| i.pow(2) as f32).sum::<f32>().sqrt()
-}
+impl JPS3DNeib {
+    // nsz contains the number of neighbors for the four different types of moves:
+    // no move (norm 0):        26 neighbors always added
+    //                          0 forced neighbors to check (never happens)
+    //                          0 neighbors to add if forced (never happens)
+    // straight (norm 1):       1 neighbor always added
+    //                          8 forced neighbors to check
+    //                          8 neighbors to add if forced
+    // diagonal (norm sqrt(2)): 3 neighbors always added
+    //                          8 forced neighbors to check
+    //                          12 neighbors to add if forced
+    // diagonal (norm sqrt(3)): 7 neighbors always added
+    //                          6 forced neighbors to check
+    //                          12 neighbors to add if forced
+    #[allow(non_upper_case_globals)]
+    pub const nsz: [[i32; 2]; 4] = [[26, 0], [1, 8], [3, 12], [7, 12]];
 
-#[allow(unused)]
-pub fn manhattan_distance(pos1: &Grid, pos2: &Grid) -> f32 {
-    let d = pos1 - pos2;
-    d.into_iter().map(|i| i.abs() as f32).sum()
-}
+    #[allow(non_snake_case)]
+    pub(crate) fn Neib(
+        dx: i32,
+        dy: i32,
+        dz: i32,
+        norm1: i32,
+        dev: i32,
+        id: usize,
+        t: &mut [[[i32; 26]; 3]; 27],
+    ) {
+        let (mut x, mut y, mut z) = (0, 0, 0);
+        let tx: &mut i32 = &mut x;
+        let ty: &mut i32 = &mut y;
+        let tz: &mut i32 = &mut z;
 
-#[allow(unused)]
-pub fn jump(
-    map: &[bool],
-    goal: &Grid,
-    startpos: &Grid,
-    d: &Dir,
-    x_max: i32,
-    y_max: i32,
-    z_max: i32,
-) -> Option<Node> {
-    let norm_d: u32 = d.into_iter().map(|i| i.abs() as u32).sum();
-    if norm_d == 0 {
-        return None;
-    }
-    let (xdim, ydim, zdim) = (1 + x_max as usize, 1 + y_max as usize, 1 + z_max as usize);
-    let newpos = step(startpos, d);
-
-    // ourside the grid on the newpos
-    if is_outmap_check(&newpos, x_max, y_max, z_max) {
-        return None;
-    }
-    // meet the obstacle on the newpos
-    else if is_ob_check(&newpos, map, xdim, ydim, zdim) {
-        return None;
-    }
-    // if it's the goal. in this case, dir doesn't matter.
-    else if newpos == *goal {
-        let newnode = Node {
-            pos: newpos,
-            ..Default::default()
-        };
-        return Some(newnode);
-    }
-
-    if norm_d == 2 {
-        let dside = dir_2dto1d(d);
-        if is_ob_check(&(startpos + dside[0]), map, xdim, ydim, zdim)
-            && is_ob_check(&(startpos + dside[1]), map, xdim, ydim, zdim)
-        {
-            return None;
-        }
-    }
-
-    let mut dirs = get_forceneighbour_dirs(&newpos, d, map, x_max, y_max, z_max);
-    let mut newnode0 = Node::default();
-    if dirs.len() > 0 {
-        newnode0 = Node {
-            pos: newpos,
-            dir: dirs.clone(),
-            ..Default::default()
-        };
-        // return Some(newnode);
-    }
-
-    // go 3d diagonal
-    if norm_d == 3 {
-        // one 3d-diagonal change three 2d-diagonal + three straght line
-        let do6 = [
-            Dir::new(0, d[1], d[2]),
-            Dir::new(d[0], 0, d[2]),
-            Dir::new(d[0], d[1], 0),
-            Dir::new(d[0], 0, 0),
-            Dir::new(0, d[1], 0),
-            Dir::new(0, 0, d[2]),
-        ];
-
-        let mut dir: Vec<Dir> = vec![*d];
-        for dk in do6.into_iter() {
-            if jump(map, goal, &newpos, &dk, x_max, y_max, z_max).is_some() {
-                // Add the direction of find ForceNegihbour
-                dir.push(dk);
+        match norm1 {
+            // norm1 == 0
+            0 => match dev {
+                0 => {
+                    *tx = 1;
+                    *ty = 0;
+                    *tz = 0;
+                }
+                1 => {
+                    *tx = -1;
+                    *ty = 0;
+                    *tz = 0;
+                }
+                2 => {
+                    *tx = 0;
+                    *ty = 1;
+                    *tz = 0;
+                }
+                3 => {
+                    *tx = 1;
+                    *ty = 1;
+                    *tz = 0;
+                }
+                4 => {
+                    *tx = -1;
+                    *ty = 1;
+                    *tz = 0;
+                }
+                5 => {
+                    *tx = 0;
+                    *ty = -1;
+                    *tz = 0;
+                }
+                6 => {
+                    *tx = 1;
+                    *ty = -1;
+                    *tz = 0;
+                }
+                7 => {
+                    *tx = -1;
+                    *ty = -1;
+                    *tz = 0;
+                }
+                8 => {
+                    *tx = 0;
+                    *ty = 0;
+                    *tz = 1;
+                }
+                9 => {
+                    *tx = 1;
+                    *ty = 0;
+                    *tz = 1;
+                }
+                10 => {
+                    *tx = -1;
+                    *ty = 0;
+                    *tz = 1;
+                }
+                11 => {
+                    *tx = 0;
+                    *ty = 1;
+                    *tz = 1;
+                }
+                12 => {
+                    *tx = 1;
+                    *ty = 1;
+                    *tz = 1;
+                }
+                13 => {
+                    *tx = -1;
+                    *ty = 1;
+                    *tz = 1;
+                }
+                14 => {
+                    *tx = 0;
+                    *ty = -1;
+                    *tz = 1;
+                }
+                15 => {
+                    *tx = 1;
+                    *ty = -1;
+                    *tz = 1;
+                }
+                16 => {
+                    *tx = -1;
+                    *ty = -1;
+                    *tz = 1;
+                }
+                17 => {
+                    *tx = 0;
+                    *ty = 0;
+                    *tz = -1;
+                }
+                18 => {
+                    *tx = 1;
+                    *ty = 0;
+                    *tz = -1;
+                }
+                19 => {
+                    *tx = -1;
+                    *ty = 0;
+                    *tz = -1;
+                }
+                20 => {
+                    *tx = 0;
+                    *ty = 1;
+                    *tz = -1;
+                }
+                21 => {
+                    *tx = 1;
+                    *ty = 1;
+                    *tz = -1;
+                }
+                22 => {
+                    *tx = -1;
+                    *ty = 1;
+                    *tz = -1;
+                }
+                23 => {
+                    *tx = 0;
+                    *ty = -1;
+                    *tz = -1;
+                }
+                24 => {
+                    *tx = 1;
+                    *ty = -1;
+                    *tz = -1;
+                }
+                25 => {
+                    *tx = -1;
+                    *ty = -1;
+                    *tz = -1;
+                }
+                _ => {
+                    panic!("Shouldn't happen");
+                }
+            },
+            // norm1 == 1
+            1 => {
+                *tx = dx;
+                *ty = dy;
+                *tz = dz;
             }
-        }
-
-        // find a ForceNegihbour
-        if dir.len() > 1 {
-            // let mut dirsc = dirs.clone();
-            dir.append(&mut dirs);
-            dir = dir.into_iter().unique().collect();
-            let newnode = Node {
-                pos: newpos,
-                dir: dir,
-                ..Default::default()
-            };
-            return Some(newnode);
-        }
-    }
-
-    // go 2d diagonal
-    if norm_d == 2 {
-        let do3 = [
-            Dir::new(d[0], 0, 0),
-            Dir::new(0, d[1], 0),
-            Dir::new(0, 0, d[2]),
-        ];
-        let mut dir: Vec<Dir> = vec![*d];
-        for dk in do3.into_iter() {
-            if jump(map, goal, &newpos, &dk, x_max, y_max, z_max).is_some() {
-                // Add the direction of find ForceNegihbour
-                dir.push(dk);
-            }
-        }
-
-        // find a ForceNegihbour
-        if dir.len() > 1 {
-            dir.append(&mut dirs);
-            dir = dir.into_iter().unique().collect();
-
-            let newnode = Node {
-                pos: newpos,
-                dir: dir,
-                ..Default::default()
-            };
-            return Some(newnode);
-        }
-    }
-    if dirs.len() > 0 {
-        return Some(newnode0);
-    }
-
-    // [go straght] or [go diagonal not find ForceNegihbour]
-    let newnode = jump(map, goal, &newpos, d, x_max, y_max, z_max);
-    return newnode;
-}
-
-/// suppose grid coordinates applies the design:  x has xdim grids (similar for y, z)
-/// suppose the map is 0-1 binary encoded array. for example, a 3×3×3 map is a 27-length array.
-/// `false` means free, `true` means occupied
-#[inline]
-pub fn is_ob_check(pos: &Grid, map: &[bool], xdim: usize, ydim: usize, _zdim: usize) -> bool {
-    let idx = pos[0] as usize + pos[1] as usize * xdim + pos[2] as usize * xdim * ydim;
-    map[idx]
-}
-
-pub fn dir_2dto1d(d: &Dir) -> [Dir; 2] {
-    let mut dside = [Dir::zeros(), Dir::zeros()];
-    let mut k = 0;
-    if d[0] != 0 {
-        dside[k][0] = d[0];
-        k += 1;
-    }
-    if d[1] != 0 {
-        dside[k][1] = d[1];
-        k += 1;
-    }
-    if d[2] != 0 {
-        dside[k][2] = d[2];
-    }
-
-    dside
-}
-
-/// suppose grid coordinates applies the design:  x has xdim grids (similar for y, z), and,
-/// 0 <= x <= x_max, xdim = x_max + 1
-/// `is_outmap_check` returning true means out of map
-/// `is_outmap_check` returning false means inside map
-#[inline]
-pub fn is_outmap_check(pos: &Grid, x_max: i32, y_max: i32, z_max: i32) -> bool {
-    if pos[0] < 0 || pos[0] > x_max || pos[1] < 0 || pos[1] > y_max || pos[2] < 0 || pos[2] > z_max
-    {
-        return true;
-    }
-    false
-}
-
-pub fn has_forceneighbour_check(
-    pos: &Grid,
-    d: &Dir,
-    map: &[bool],
-    x_max: i32,
-    y_max: i32,
-    z_max: i32,
-) -> bool {
-    let (xdim, ydim, zdim) = (1 + x_max as usize, 1 + y_max as usize, 1 + z_max as usize);
-    let pos_nb = pos + d;
-    if is_outmap_check(pos, x_max, y_max, z_max)
-        || !is_ob_check(pos, map, xdim, ydim, zdim)
-        || is_outmap_check(&pos_nb, x_max, y_max, z_max)
-        || is_ob_check(&pos_nb, map, xdim, ydim, zdim)
-    {
-        return false;
-    }
-    true
-}
-
-pub fn modify(pos: &Grid, d: &Dir, map: &[bool], x_max: i32, y_max: i32, z_max: i32) -> bool {
-    let (xdim, ydim, zdim) = (1 + x_max as usize, 1 + y_max as usize, 1 + z_max as usize);
-    let pos_nb = pos + d;
-    if !is_outmap_check(pos, x_max, y_max, z_max)
-        && is_ob_check(pos, map, xdim, ydim, zdim)
-        && is_outmap_check(&pos_nb, x_max, y_max, z_max)
-        && !is_ob_check(&pos_nb, map, xdim, ydim, zdim)
-    {
-        return true;
-    }
-    false
-}
-
-pub fn get_forceneighbour_dirs(
-    pos: &Grid,
-    d: &Dir,
-    map: &[bool],
-    x_max: i32,
-    y_max: i32,
-    z_max: i32,
-) -> Vec<Dir> {
-    let mut dirs: Vec<Dir> = Vec::new();
-    if is_outmap_check(&(pos + d), x_max, y_max, z_max) {
-        return dirs;
-    }
-
-    let norm_d: i32 = d.into_iter().map(|i| i.abs() as i32).sum();
-    let (xdim, ydim, zdim) = (1 + x_max as usize, 1 + y_max as usize, 1 + z_max as usize);
-    // [go straght]  ----------------------------------------------
-    if norm_d == 1 {
-        if is_ob_check(&(pos + d), map, xdim, ydim, zdim) {
-            return dirs;
-        }
-        let d1 = Dir::new(d[2].abs(), d[0].abs(), d[1].abs());
-        let d2 = Dir::new(d[1].abs(), d[2].abs(), d[0].abs());
-        let dob = [d1, -d1, d2, -d2, d1 + d2, -d1 - d2, d1 - d2, -d1 + d2];
-        for dk in dob.into_iter() {
-            if has_forceneighbour_check(&(pos + dk), d, map, x_max, y_max, z_max) {
-                dirs.push(dk + d);
-            }
-        }
-    }
-    // [go 2D-diagonal] ----------------------------------------------
-    else if norm_d == 2 {
-        let dside = dir_2dto1d(d);
-        for ds in dside.into_iter() {
-            if has_forceneighbour_check(&(pos - ds), &(d - ds), map, x_max, y_max, z_max) {
-                dirs.push(d - 2 * ds);
-            }
-        }
-        let d1 = Dir::new(d[0].abs() - 1, d[1].abs() - 1, d[2].abs() - 1);
-        if has_forceneighbour_check(&(pos + d1), d, map, x_max, y_max, z_max) {
-            dirs.push(d + d1);
-        }
-        if has_forceneighbour_check(&(pos - d1), d, map, x_max, y_max, z_max) {
-            dirs.push(d - d1);
-        }
-    }
-    // [go 3D-diagonal]  ----------------------------------------------
-    else {
-        dirs = get_forceneighbour_dirs(pos, &Dir::new(0, d[1], d[2]), map, x_max, y_max, z_max);
-        dirs.append(&mut get_forceneighbour_dirs(
-            pos,
-            &Dir::new(d[0], 0, d[2]),
-            map,
-            x_max,
-            y_max,
-            z_max,
-        ));
-        dirs.append(&mut get_forceneighbour_dirs(
-            pos,
-            &Dir::new(d[0], d[1], 0),
-            map,
-            x_max,
-            y_max,
-            z_max,
-        ));
-        dirs = dirs.into_iter().unique().filter(|x| x != d).collect();
-    }
-    dirs
-}
-
-#[inline]
-pub fn step(pos: &Grid, d: &Dir) -> Grid {
-    pos + d
-}
-
-#[allow(unused)]
-mod tests {
-    use super::dir_2dto1d;
-    use crate::linalg::{OVector, U3};
-    use crate::{jps_3d_v1, Dir, Grid};
-    use std::collections::HashSet;
-    #[allow(unused)]
-    // #[test]
-    pub fn test_all_dirs() {
-        let mut out: Vec<Dir> = Vec::new();
-        let o = Grid::new(0, 0, 0);
-        for x in -1..2 {
-            for y in -1..2 {
-                for z in -1..2 {
-                    let p = Grid::new(x, y, z);
-                    let dir = o - p;
-                    if dir.dot(&dir) == 0 {
-                        continue;
+            // norm1 == 2
+            2 => match dev {
+                0 => {
+                    if dz == 0 {
+                        *tx = 0;
+                        *ty = dy;
+                        *tz = 0;
+                    } else {
+                        *tx = 0;
+                        *ty = 0;
+                        *tz = dz;
                     }
-                    println!("Dir::new({},{},{}),", dir[0], dir[1], dir[2]);
-                    out.push(dir);
+                }
+                1 => {
+                    if dx == 0 {
+                        *tx = 0;
+                        *ty = dy;
+                        *tz = 0;
+                    } else {
+                        *tx = dx;
+                        *ty = 0;
+                        *tz = 0;
+                    }
+                }
+                2 => {
+                    *tx = dx;
+                    *ty = dy;
+                    *tz = dz;
+                }
+                _ => panic!("Shouln't happen"),
+            },
+            // norm1 == 3
+            3 => match dev {
+                0 => {
+                    *tx = dx;
+                    *ty = 0;
+                    *tz = 0;
+                }
+                1 => {
+                    *tx = 0;
+                    *ty = dy;
+                    *tz = 0;
+                }
+                2 => {
+                    *tx = 0;
+                    *ty = 0;
+                    *tz = dz;
+                }
+                3 => {
+                    *tx = dx;
+                    *ty = dy;
+                    *tz = 0;
+                }
+                4 => {
+                    *tx = dx;
+                    *ty = 0;
+                    *tz = dz;
+                }
+                5 => {
+                    *tx = 0;
+                    *ty = dy;
+                    *tz = dz;
+                }
+                6 => {
+                    *tx = dx;
+                    *ty = dy;
+                    *tz = dz;
+                }
+                _ => panic!("Shouldn't happen"),
+            },
+            // other norm1
+            _ => panic!("Shouldn't happen"),
+        }
+        // apply changes
+        t[id][0][dev as usize] = x;
+        t[id][1][dev as usize] = y;
+        t[id][2][dev as usize] = z;
+        // *(&mut (t[id][0][dev as usize])) = x;
+        // *(&mut (t[id][1][dev as usize])) = y;
+        // *(&mut (t[id][2][dev as usize])) = z;
+    }
+
+    #[allow(non_snake_case)]
+    pub(crate) fn FNeib(
+        dx: i32,
+        dy: i32,
+        dz: i32,
+        norm1: i32,
+        dev: i32,
+        id: usize,
+        f1: &mut [[[i32; 12]; 3]; 27],
+        f2: &mut [[[i32; 12]; 3]; 27],
+    ) {
+        let (mut x, mut y, mut z, mut xx, mut yy, mut zz) = (0, 0, 0, 0, 0, 0);
+        let fx: &mut i32 = &mut x;
+        let fy: &mut i32 = &mut y;
+        let fz: &mut i32 = &mut z;
+        let nx: &mut i32 = &mut xx;
+        let ny: &mut i32 = &mut yy;
+        let nz: &mut i32 = &mut zz;
+
+        match norm1 {
+            // norm1 == 1
+            1 => {
+                match dev {
+                    0 => {
+                        *fx = 0;
+                        *fy = 1;
+                        *fz = 0;
+                    }
+                    1 => {
+                        *fx = 0;
+                        *fy = -1;
+                        *fz = 0;
+                    }
+                    2 => {
+                        *fx = 1;
+                        *fy = 0;
+                        *fz = 0;
+                    }
+                    3 => {
+                        *fx = 1;
+                        *fy = 1;
+                        *fz = 0;
+                    }
+                    4 => {
+                        *fx = 1;
+                        *fy = -1;
+                        *fz = 0;
+                    }
+                    5 => {
+                        *fx = -1;
+                        *fy = 0;
+                        *fz = 0;
+                    }
+                    6 => {
+                        *fx = -1;
+                        *fy = 1;
+                        *fz = 0;
+                    }
+                    7 => {
+                        *fx = -1;
+                        *fy = -1;
+                        *fz = 0;
+                    }
+                    _ => panic!("Shouldn't happen"),
+                }
+                *nx = *fx;
+                *ny = *fy;
+                *nz = dz;
+                // switch order if different direction
+                if dx != 0 {
+                    *fz = *fx;
+                    *fx = 0;
+                    *nz = *fz;
+                    *nx = dx;
+                }
+                if dy != 0 {
+                    *fz = *fy;
+                    *fy = 0;
+                    *nz = *fz;
+                    *ny = dy;
                 }
             }
+            // norm1 == 2
+            2 => {
+                if dx == 0 {
+                    match dev {
+                        0 => {
+                            *fx = 0;
+                            *fy = 0;
+                            *fz = -dz;
+                            *nx = 0;
+                            *ny = dy;
+                            *nz = -dz;
+                        }
+                        1 => {
+                            *fx = 0;
+                            *fy = -dy;
+                            *fz = 0;
+                            *nx = 0;
+                            *ny = -dy;
+                            *nz = dz;
+                        }
+                        2 => {
+                            *fx = 1;
+                            *fy = 0;
+                            *fz = 0;
+                            *nx = 1;
+                            *ny = dy;
+                            *nz = dz;
+                        }
+                        3 => {
+                            *fx = -1;
+                            *fy = 0;
+                            *fz = 0;
+                            *nx = -1;
+                            *ny = dy;
+                            *nz = dz;
+                        }
+                        4 => {
+                            *fx = 1;
+                            *fy = 0;
+                            *fz = -dz;
+                            *nx = 1;
+                            *ny = dy;
+                            *nz = -dz;
+                        }
+                        5 => {
+                            *fx = 1;
+                            *fy = -dy;
+                            *fz = 0;
+                            *nx = 1;
+                            *ny = -dy;
+                            *nz = dz;
+                        }
+                        6 => {
+                            *fx = -1;
+                            *fy = 0;
+                            *fz = -dz;
+                            *nx = -1;
+                            *ny = dy;
+                            *nz = -dz;
+                        }
+                        7 => {
+                            *fx = -1;
+                            *fy = -dy;
+                            *fz = 0;
+                            *nx = -1;
+                            *ny = -dy;
+                            *nz = dz;
+                        }
+                        // Extras
+                        8 => {
+                            *fx = 1;
+                            *fy = 0;
+                            *fz = 0;
+                            *nx = 1;
+                            *ny = dy;
+                            *nz = 0;
+                        }
+                        9 => {
+                            *fx = 1;
+                            *fy = 0;
+                            *fz = 0;
+                            *nx = 1;
+                            *ny = 0;
+                            *nz = dz;
+                        }
+                        10 => {
+                            *fx = -1;
+                            *fy = 0;
+                            *fz = 0;
+                            *nx = -1;
+                            *ny = dy;
+                            *nz = 0;
+                        }
+                        11 => {
+                            *fx = -1;
+                            *fy = 0;
+                            *fz = 0;
+                            *nx = -1;
+                            *ny = 0;
+                            *nz = dz;
+                        }
+                        _ => panic!("Shouldn't happen"),
+                    }
+                } else if dy == 0 {
+                    match dev {
+                        0 => {
+                            *fx = 0;
+                            *fy = 0;
+                            *fz = -dz;
+                            *nx = dx;
+                            *ny = 0;
+                            *nz = -dz;
+                        }
+                        1 => {
+                            *fx = -dx;
+                            *fy = 0;
+                            *fz = 0;
+                            *nx = -dx;
+                            *ny = 0;
+                            *nz = dz;
+                        }
+                        2 => {
+                            *fx = 0;
+                            *fy = 1;
+                            *fz = 0;
+                            *nx = dx;
+                            *ny = 1;
+                            *nz = dz;
+                        }
+                        3 => {
+                            *fx = 0;
+                            *fy = -1;
+                            *fz = 0;
+                            *nx = dx;
+                            *ny = -1;
+                            *nz = dz;
+                        }
+                        4 => {
+                            *fx = 0;
+                            *fy = 1;
+                            *fz = -dz;
+                            *nx = dx;
+                            *ny = 1;
+                            *nz = -dz;
+                        }
+                        5 => {
+                            *fx = -dx;
+                            *fy = 1;
+                            *fz = 0;
+                            *nx = -dx;
+                            *ny = 1;
+                            *nz = dz;
+                        }
+                        6 => {
+                            *fx = 0;
+                            *fy = -1;
+                            *fz = -dz;
+                            *nx = dx;
+                            *ny = -1;
+                            *nz = -dz;
+                        }
+                        7 => {
+                            *fx = -dx;
+                            *fy = -1;
+                            *fz = 0;
+                            *nx = -dx;
+                            *ny = -1;
+                            *nz = dz;
+                        }
+                        // Extras
+                        8 => {
+                            *fx = 0;
+                            *fy = 1;
+                            *fz = 0;
+                            *nx = dx;
+                            *ny = 1;
+                            *nz = 0;
+                        }
+                        9 => {
+                            *fx = 0;
+                            *fy = 1;
+                            *fz = 0;
+                            *nx = 0;
+                            *ny = 1;
+                            *nz = dz;
+                        }
+                        10 => {
+                            *fx = 0;
+                            *fy = -1;
+                            *fz = 0;
+                            *nx = dx;
+                            *ny = -1;
+                            *nz = 0;
+                        }
+                        11 => {
+                            *fx = 0;
+                            *fy = -1;
+                            *fz = 0;
+                            *nx = 0;
+                            *ny = -1;
+                            *nz = dz;
+                        }
+                        _ => panic!("Shouldn't happen"),
+                    }
+                } else {
+                    // dz == 0
+                    match dev {
+                        0 => {
+                            *fx = 0;
+                            *fy = -dy;
+                            *fz = 0;
+                            *nx = dx;
+                            *ny = -dy;
+                            *nz = 0;
+                        }
+                        1 => {
+                            *fx = -dx;
+                            *fy = 0;
+                            *fz = 0;
+                            *nx = -dx;
+                            *ny = dy;
+                            *nz = 0;
+                        }
+                        2 => {
+                            *fx = 0;
+                            *fy = 0;
+                            *fz = 1;
+                            *nx = dx;
+                            *ny = dy;
+                            *nz = 1;
+                        }
+                        3 => {
+                            *fx = 0;
+                            *fy = 0;
+                            *fz = -1;
+                            *nx = dx;
+                            *ny = dy;
+                            *nz = -1;
+                        }
+                        4 => {
+                            *fx = 0;
+                            *fy = -dy;
+                            *fz = 1;
+                            *nx = dx;
+                            *ny = -dy;
+                            *nz = 1;
+                        }
+                        5 => {
+                            *fx = -dx;
+                            *fy = 0;
+                            *fz = 1;
+                            *nx = -dx;
+                            *ny = dy;
+                            *nz = 1;
+                        }
+                        6 => {
+                            *fx = 0;
+                            *fy = -dy;
+                            *fz = -1;
+                            *nx = dx;
+                            *ny = -dy;
+                            *nz = -1;
+                        }
+                        7 => {
+                            *fx = -dx;
+                            *fy = 0;
+                            *fz = -1;
+                            *nx = -dx;
+                            *ny = dy;
+                            *nz = -1;
+                        }
+                        // Extras
+                        8 => {
+                            *fx = 0;
+                            *fy = 0;
+                            *fz = 1;
+                            *nx = dx;
+                            *ny = 0;
+                            *nz = 1;
+                        }
+                        9 => {
+                            *fx = 0;
+                            *fy = 0;
+                            *fz = 1;
+                            *nx = 0;
+                            *ny = dy;
+                            *nz = 1;
+                        }
+                        10 => {
+                            *fx = 0;
+                            *fy = 0;
+                            *fz = -1;
+                            *nx = dx;
+                            *ny = 0;
+                            *nz = -1;
+                        }
+                        11 => {
+                            *fx = 0;
+                            *fy = 0;
+                            *fz = -1;
+                            *nx = 0;
+                            *ny = dy;
+                            *nz = -1;
+                        }
+                        _ => panic!("Shouldn't happen"),
+                    }
+                }
+            }
+            // norm1 == 3
+            3 => {
+                match dev {
+                    0 => {
+                        *fx = -dx;
+                        *fy = 0;
+                        *fz = 0;
+                        *nx = -dx;
+                        *ny = dy;
+                        *nz = dz;
+                    }
+                    1 => {
+                        *fx = 0;
+                        *fy = -dy;
+                        *fz = 0;
+                        *nx = dx;
+                        *ny = -dy;
+                        *nz = dz;
+                    }
+                    2 => {
+                        *fx = 0;
+                        *fy = 0;
+                        *fz = -dz;
+                        *nx = dx;
+                        *ny = dy;
+                        *nz = -dz;
+                    }
+                    // Need to check up to here for forced!
+                    3 => {
+                        *fx = 0;
+                        *fy = -dy;
+                        *fz = -dz;
+                        *nx = dx;
+                        *ny = -dy;
+                        *nz = -dz;
+                    }
+                    4 => {
+                        *fx = -dx;
+                        *fy = 0;
+                        *fz = -dz;
+                        *nx = -dx;
+                        *ny = dy;
+                        *nz = -dz;
+                    }
+                    5 => {
+                        *fx = -dx;
+                        *fy = -dy;
+                        *fz = 0;
+                        *nx = -dx;
+                        *ny = -dy;
+                        *nz = dz;
+                    }
+                    // Extras
+                    6 => {
+                        *fx = -dx;
+                        *fy = 0;
+                        *fz = 0;
+                        *nx = -dx;
+                        *ny = 0;
+                        *nz = dz;
+                    }
+                    7 => {
+                        *fx = -dx;
+                        *fy = 0;
+                        *fz = 0;
+                        *nx = -dx;
+                        *ny = dy;
+                        *nz = 0;
+                    }
+                    8 => {
+                        *fx = 0;
+                        *fy = -dy;
+                        *fz = 0;
+                        *nx = 0;
+                        *ny = -dy;
+                        *nz = dz;
+                    }
+                    9 => {
+                        *fx = 0;
+                        *fy = -dy;
+                        *fz = 0;
+                        *nx = dx;
+                        *ny = -dy;
+                        *nz = 0;
+                    }
+                    10 => {
+                        *fx = 0;
+                        *fy = 0;
+                        *fz = -dz;
+                        *nx = 0;
+                        *ny = dy;
+                        *nz = -dz;
+                    }
+                    11 => {
+                        *fx = 0;
+                        *fy = 0;
+                        *fz = -dz;
+                        *nx = dx;
+                        *ny = 0;
+                        *nz = -dz;
+                    }
+                    _ => panic!("Shouldn't happen"),
+                }
+            }
+            // norm1 other cases
+            _ => panic!("Shouldn't happen"),
         }
-        assert!(out.len() == 26);
-    }
-    // #[test]
-    pub fn test_dir_2dto1d() {
-        let dir = Dir::new(1, 0, -1);
-        let subdirs = dir_2dto1d(&dir);
-        println!("{:?}", subdirs);
-        assert!(subdirs[0] + subdirs[1] == dir);
-    }
-    #[test]
-    pub fn test_jps_3d() {
-        let map = [
-            //↓ start
-            0, 1, 1, 1, 1, //
-            0, 1, 1, 1, 1, //
-            0, 1, 1, 1, 1, //
-            0, 1, 1, 1, 1, //
-            0, 1, 1, 1, 1, //
-            //
-            1, 1, 1, 1, 1, //
-            1, 1, 1, 1, 1, //
-            1, 1, 1, 1, 1, //
-            1, 1, 1, 1, 1, //
-            0, 0, 0, 0, 0, //
-            //
-            1, 1, 1, 1, 0, //
-            1, 1, 1, 1, 0, //
-            1, 1, 1, 1, 0, //
-            1, 1, 1, 1, 0, //
-            1, 1, 1, 1, 0, //
-            //
-            0, 0, 0, 0, 0, //
-            1, 1, 1, 1, 1, //
-            1, 1, 1, 1, 1, //
-            1, 1, 1, 1, 1, //
-            1, 1, 1, 1, 1, //
-            //
-            0, 1, 1, 1, 1, //
-            0, 1, 1, 1, 1, //
-            0, 1, 0, 0, 1, //
-            0, 0, 0, 0, 1, //
-            0, 1, 1, 0, 0, //# ← goal
-        ];
-        let binary_map: Vec<bool> = map.into_iter().map(|x| x == 1).collect();
-        let map = &binary_map[..];
-        let map_start = Grid::new(0, 0, 0);
-        let map_goal = Grid::new(4, 4, 4);
-        let (x_max, y_max, z_max) = (4, 4, 4);
-        let path = jps_3d_v1(map, &map_start, &map_goal, x_max, y_max, z_max);
 
-        assert!(path.is_some());
-        println!("{:?}", path.unwrap());
+        f1[id][0][dev as usize] = x;
+        f1[id][1][dev as usize] = y;
+        f1[id][2][dev as usize] = z;
+        f2[id][0][dev as usize] = xx;
+        f2[id][1][dev as usize] = yy;
+        f2[id][2][dev as usize] = zz;
     }
 }

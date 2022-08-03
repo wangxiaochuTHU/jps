@@ -1,13 +1,6 @@
 # jps : Jump Point Search in Rust.
 Jump Point Search Algorithm Implementation in Rust.
 
-**NOTE (Very Important)**: 
-
-This Crate currently has bugs such that it would only work in some special scenes that require plenties of grids with force neighbors due to the incomplete recursion. So DON'T use it for important work. Next I will take time to read the C++ version and try to follow it.
-
-
-
-
 
 # Current implementation status
 
@@ -18,9 +11,18 @@ This Crate currently has bugs such that it would only work in some special scene
 Add this to your Cargo.toml:
 ```
 [dependencies]
-jps = "0.1"
+jps = "1.0"
 ```
-
+# Example
+see the test
+```
+cargo test -- --show-output
+```
+the output shows:
+```
+path is :
+(0, 0, 0) ➡ (0, 1, 0) ➡ (0, 2, 0) ➡ (0, 3, 0) ➡ (1, 4, 1) ➡ (2, 4, 1) ➡ (3, 4, 1) ➡ (4, 3, 2) ➡ (4, 2, 2) ➡ (4, 1, 2) ➡ (3, 0, 3) ➡ (2, 1, 4) ➡ (2, 2, 4) ➡ (3, 3, 4) ➡ (4, 4, 4)
+```
 # The Map Description
 Two version of main API are provided for 3D JPS. The only difference lies in the input parameter, i.e.
 
@@ -38,7 +40,7 @@ Two version of main API are provided for 3D JPS. The only difference lies in the
 0, 1, 1, 1, 1,      // -> y = 4
 
 // z = 1
-1, 1, 1, 1, 1, 
+1, 1, 1, 1, 1,  
 1, 1, 1, 1, 1,
 1, 1, 1, 1, 1, 
 1, 1, 1, 1, 1, 
@@ -72,7 +74,7 @@ Two version of main API are provided for 3D JPS. The only difference lies in the
 
 # Reference
 
-***Logic follows the Matlab version (https://github.com/LenaShengzhen/AerialRobotics)***
+***Logic follows the C++ version (https://github.com/KumarRobotics/jps3d)***
 
 ***Also NOTE that some functions havn't been thoroughly tested, so please let me know if there is any error.***
 
