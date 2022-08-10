@@ -62,7 +62,8 @@ pub mod tests {
         let map_start = (0, 0, 0);
         let map_goal = (4, 4, 4);
 
-        let mut graphsearch = GraphSearch::new_v1(free_set, occ_set, 5, 5, 5, 1.0);
+        // or using,  GraphSearch::new_v1(Some(free_set), occ_set, 5, 5, 5, 1.0)
+        let mut graphsearch = GraphSearch::new_v1(None, occ_set, 5, 5, 5, 1.0);
 
         if graphsearch.plan_main(map_start, map_goal, true, 50) {
             let path = &graphsearch.path_;

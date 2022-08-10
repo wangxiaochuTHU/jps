@@ -43,8 +43,10 @@ pub struct GraphSearch {
     pub(crate) ns_: Vector<(i32, i32, i32)>,
     pub(crate) jn3d_: JPS3DNeib,
 
-    /// free map
-    pub fmap_: HashSet<(i32, i32, i32)>,
+    /// free map. if it's `None`, a grid will be free as long as it is within the box defined by xdim × ydim × zdim.
+    ///
+    /// otherwise, when it's `Some`, the check for being contained in the free map is additionally needed to check whether a grid is free.
+    pub fmap_: Option<HashSet<(i32, i32, i32)>>,
     /// occupied map
     pub omap_: HashSet<(i32, i32, i32)>,
     /// x-, y-, z- dimensions
@@ -77,7 +79,7 @@ impl GraphSearch {
     /// `eps_`  : a scalar in calculating the costs.
     ///
     pub fn new_v1(
-        fmap_: HashSet<(i32, i32, i32)>,
+        fmap_: Option<HashSet<(i32, i32, i32)>>,
         omap_: HashSet<(i32, i32, i32)>,
         xdim: i32,
         ydim: i32,
@@ -153,7 +155,7 @@ impl GraphSearch {
                 free_set.insert((x, y, z));
             }
         }
-        Self::new_v1(free_set, occ_set, xdim, ydim, zdim, eps_)
+        Self::new_v1(Some(free_set), occ_set, xdim, ydim, zdim, eps_)
     }
 }
 
@@ -508,13 +510,18 @@ impl GraphSearch {
 
     #[inline]
     pub(crate) fn is_free(&self, pos: &(i32, i32, i32)) -> bool {
-        pos.0 >= 0
-            && pos.0 < self.xdim
-            && pos.1 >= 0
-            && pos.1 < self.ydim
-            && pos.2 >= 0
-            && pos.2 < self.zdim
-            && self.fmap_.contains(&pos)
+        let is_inside = || {
+            pos.0 >= 0
+                && pos.0 < self.xdim
+                && pos.1 >= 0
+                && pos.1 < self.ydim
+                && pos.2 >= 0
+                && pos.2 < self.zdim
+        };
+        match self.fmap_.as_ref() {
+            Some(fmap) => fmap.contains(&pos) && is_inside(),
+            None => is_inside(),
+        }
     }
 
     #[inline]
