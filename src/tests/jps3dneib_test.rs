@@ -66,18 +66,23 @@ pub mod tests {
 
         if graphsearch.plan_main(map_start, map_goal, true, 50) {
             let path = &graphsearch.path_;
+            let turnings = &graphsearch.turnings;
             let fmt_path = path.iter().enumerate().map(|(i, x)| {
                 if i > 0 {
-                    format!("{:?} ➡ ", x.id)
-                } else {
                     format!("{:?}", x.id)
+                } else {
+                    format!("{:?}➡ ", x.id)
                 }
             });
             println!("path is :");
-            for node in fmt_path.rev() {
+            for node in fmt_path {
                 print!("{}", node);
             }
             println!("");
+            println!("turnings are :");
+            for t in turnings.iter() {
+                print!("{:?} ", t);
+            }
         }
     }
 }

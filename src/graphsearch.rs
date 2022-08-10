@@ -1,6 +1,7 @@
 use super::base::{JPS3DNeib, State};
 // use float_ord::{sort, FloatOrd};
 use im::Vector;
+use itertools::Itertools;
 use ordered_float::OrderedFloat;
 use priority_queue::PriorityQueue;
 use std::cmp::Reverse;
@@ -13,7 +14,10 @@ use std::collections::{HashMap, HashSet};
 ///
 /// `hm_` :  a HashMap for saving nodes that have been visited.
 ///
-/// `path_`: the path in reverse order, i.e. from goal to start.
+/// `path_`: the path in the forward order, i.e. from start to goal.
+///
+/// `turnings` : the turning points along the path in the forward order, including start and goal.
+/// `turnings` can be differenced for constructing lines, e.g.  line[k] := (turnings[k], turnings[k+1])
 ///
 ///  `ns_` : all neighbors in terms of relative position.
 ///
@@ -24,14 +28,20 @@ use std::collections::{HashMap, HashSet};
 ///  `omap` : HashSet containing all occupied grids.
 ///
 pub struct GraphSearch {
-    pub pq_: PriorityQueue<State, Reverse<OrderedFloat<f32>>>,
+    pub(crate) pq_: PriorityQueue<State, Reverse<OrderedFloat<f32>>>,
 
-    pub hm_: HashMap<(i32, i32, i32), State>,
+    pub(crate) hm_: HashMap<(i32, i32, i32), State>,
 
-    pub path_: Vector<State>,
+    /// the path in the forward order, i.e. from start to goal.
+    pub path_: Vec<State>,
 
-    pub ns_: Vector<(i32, i32, i32)>,
-    pub jn3d_: JPS3DNeib,
+    /// the turning points along the path in the forward order, including start and goal.
+    ///
+    /// `turnings` can be differenced for constructing lines, e.g.  line[k] := (turnings[k], turnings[k+1])
+    pub turnings: Vec<(i32, i32, i32)>,
+
+    pub(crate) ns_: Vector<(i32, i32, i32)>,
+    pub(crate) jn3d_: JPS3DNeib,
 
     /// free map
     pub fmap_: HashSet<(i32, i32, i32)>,
@@ -42,8 +52,8 @@ pub struct GraphSearch {
     pub ydim: i32,
     pub zdim: i32,
 
-    ///
-    pub eps_: f32,
+    /// a scalar in calculating the costs
+    pub(crate) eps_: f32,
 
     /// goal
     pub goal: (i32, i32, i32),
@@ -92,7 +102,8 @@ impl GraphSearch {
         Self {
             pq_: PriorityQueue::default(),
             hm_: HashMap::default(),
-            path_: Vector::default(),
+            path_: Vec::default(),
+            turnings: Vec::default(),
             ns_: ns,
             jn3d_: JPS3DNeib::default(),
             fmap_: fmap_,
@@ -148,11 +159,16 @@ impl GraphSearch {
 
 impl GraphSearch {
     #[allow(unused)]
-    pub(crate) fn recover_path(&self, node: &State, start_id: (i32, i32, i32)) -> Vector<State> {
-        let mut path: Vector<State> = Vector::new();
+    pub(crate) fn recover_path(
+        &self,
+        node: &State,
+        start_id: (i32, i32, i32),
+    ) -> (Vec<State>, Vec<(i32, i32, i32)>) {
+        let mut path: Vec<State> = Vec::new();
+        let mut turnings: Vec<(i32, i32, i32)> = Vec::new();
         let mut node_ref: Option<&State> = Some(node);
         while let Some(nd) = node_ref {
-            path.push_back(nd.clone());
+            path.push(nd.clone());
             if nd.id == start_id {
                 break;
             } else {
@@ -161,8 +177,39 @@ impl GraphSearch {
                 }
             }
         }
-        path
+        path.reverse();
+        let len = path.len();
+        let mut pre_dir: (i32, i32, i32) = (0, 0, 0);
+        for (k, (pre, cur)) in path.iter().tuple_windows().enumerate() {
+            // push goal
+            if k == 0 {
+                turnings.push(pre.id);
+                pre_dir = (
+                    cur.id.0 - pre.id.0,
+                    cur.id.1 - pre.id.1,
+                    cur.id.2 - pre.id.2,
+                );
+            } else {
+                // push turnings
+                let dir = (
+                    cur.id.0 - pre.id.0,
+                    cur.id.1 - pre.id.1,
+                    cur.id.2 - pre.id.2,
+                );
+
+                if dir != pre_dir && k < len - 2 {
+                    turnings.push(pre.id);
+                    pre_dir = dir;
+                }
+            }
+            // push start
+            if k == len - 2 {
+                turnings.push(cur.id);
+            }
+        }
+        (path, turnings)
     }
+
     #[allow(unused)]
     /// the main entry for planning.
     ///
@@ -280,7 +327,7 @@ impl GraphSearch {
 
         // let curr_node = self.hm_.get(&curr_node.id).unwrap();
 
-        self.path_ = self.recover_path(&curr_node, start_id);
+        (self.path_, self.turnings) = self.recover_path(&curr_node, start_id);
         true
     }
 
