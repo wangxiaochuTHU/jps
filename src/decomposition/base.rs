@@ -5,10 +5,25 @@ pub mod Decomp {
     // pub use yakf::linalg::*;
     pub struct Ellipsoid {
         /// center of the ellipsoid
-        center: Vec3,
+        pub center: Vec3,
         /// rotation matrix of the ellipsoid
-        r: SO3,
+        pub r: Grp3,
+        /// semi-axis a, b, c
+        pub a: f64,
+        pub b: f64,
+        pub c: f64,
+        /// matrix e = r*S*r'
+        pub e: Grp3,
     }
+
+    impl Ellipsoid {
+        pub fn distance(&self, p: &Vec3) -> f64 {
+            let dp = (p - &self.center);
+            let d = dp.transpose() * &self.e * &dp;
+            d
+        }
+    }
+
     pub fn find_perpendicular_direction(n1: &Vec3) -> Vec3 {
         let x = n1;
         let x = n1.abs();
