@@ -7,5 +7,6 @@ extern crate priority_queue;
 pub mod base;
 pub use graphsearch::GraphSearch;
 
+mod decomposition;
 mod graphsearch;
 mod tests;

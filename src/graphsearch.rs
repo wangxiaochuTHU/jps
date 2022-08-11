@@ -520,7 +520,7 @@ impl GraphSearch {
         };
         match self.fmap_.as_ref() {
             Some(fmap) => fmap.contains(&pos) && is_inside(),
-            None => is_inside(),
+            None => is_inside() && !self.is_occupied(pos),
         }
     }
 

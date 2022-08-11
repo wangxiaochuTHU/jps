@@ -70,9 +70,9 @@ pub mod tests {
             let turnings = &graphsearch.turnings;
             let fmt_path = path.iter().enumerate().map(|(i, x)| {
                 if i > 0 {
-                    format!("{:?}", x.id)
+                    format!("➡ {:?}", x.id)
                 } else {
-                    format!("{:?}➡ ", x.id)
+                    format!("{:?} ", x.id)
                 }
             });
             println!("path is :");

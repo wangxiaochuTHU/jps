@@ -1,28 +1,27 @@
 [package]
-categories = ["algorithms", "aerospace::drones","science::robotics"]
+categories = ["algorithms", "aerospace::drones", "science::robotics"]
 name = "jps"
-version = "1.0.3"
+version = "1.0.4"
 description = "Jump Point Search Implementation for Path Finding."
 edition = "2021"
-exclude = [
-  "target/*",
-  ".gitignore",
-  ".cargo/*",
-  ".vscode/*",
-  "Cargo.lock",
-]
+exclude = ["target/*", ".gitignore", ".cargo/*", ".vscode/*", "Cargo.lock"]
 
-keywords = ["3d", "jps", "path-finding","jump-point-search"]
+keywords = ["3d", "jps", "path-finding", "jump-point-search"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/wangxiaochuTHU/jps"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+decomp = ["dep:yakf"]
+
 [dependencies]
-# nalgebra = {version = "0.31",default-features = false,features = ["libm-force","alloc"]}
+yakf = { version = "0.1", default-features = false, optional = true }
 # num-traits = {version = "0.2.15", default-features = false}
-itertools = { version = "0.10.3",default-features = false, features = ["use_std"]}
+itertools = { version = "0.10.3", default-features = false, features = [
+  "use_std",
+] }
 priority-queue = "1.2.3"
 # float-ord = "0.3.2"
 ordered-float = "3.0.0"
-im = { version = "15.1.0",default-features = false}
+im = { version = "15.1.0", default-features = false }
 # ndarray = {version = "0.15.6",default-features = false }

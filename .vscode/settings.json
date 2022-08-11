@@ -5,4 +5,6 @@
     // "rust-analyzer.cargo.target": "thumbv7em-none-eabihf",
     "rust-analyzer.checkOnSave.allTargets": false,
     "rust-analyzer.lru.capacity": 1000,
+    "rust-analyzer.cargo.features": "all",
+    "rust-analyzer.checkOnSave.features": "all",
 }
