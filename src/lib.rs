@@ -7,6 +7,9 @@ extern crate priority_queue;
 pub mod base;
 pub use graphsearch::GraphSearch;
 
+#[cfg(feature = "decomp")]
+pub use decomposition::base::decomp_tool;
+
 mod decomposition;
 mod graphsearch;
 mod tests;

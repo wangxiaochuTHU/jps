@@ -1,6 +1,7 @@
 #[cfg(feature = "decomp")]
+#[allow(unused)]
 mod tests {
-    use crate::decomposition::base::Decomp::{
+    use crate::decomposition::base::decomp_tool::{
         self, find_perpendicular_direction, find_third_direction, get_attitude_from_one_vector,
         Grp3, Vec3,
     };
