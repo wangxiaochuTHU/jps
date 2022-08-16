@@ -2,6 +2,9 @@
 #[allow(non_upper_case_globals)]
 #[allow(unused)]
 pub mod decomp_tool {
+    use std::hash::Hash;
+
+    use im::HashSet;
     use itertools::Itertools;
     pub use yakf::kf::{self, so3::SO3, Grp3, Vec3};
     // pub use yakf::linalg::*;
@@ -9,10 +12,20 @@ pub mod decomp_tool {
     pub const v_max: f64 = 5.0;
     pub const r_robot: f64 = 0.2;
 
+    pub trait Voxelable {
+        fn coordinate_to_grid(&self, pos: &Vec3) -> (i32, i32, i32) {
+            unimplemented!();
+        }
+        fn grid_to_coordinate(&self, grid: &(i32, i32, i32)) -> Vec3 {
+            unimplemented!();
+        }
+        fn get_grid_size(&self) -> (f64, f64, f64) {
+            unimplemented!();
+        }
+    }
     #[derive(Debug)]
-    pub struct Decomp {
-        // /// radius of robot
-        // pub r_r: f64,
+    pub struct Decomp<T: Voxelable + Hash + Sized + Send + Clone + Copy + Default> {
+        pub trans: T,
         /// radius of safe flight,  r_s = v_max^2/(2*a_max)
         pub r_s: f64,
 
@@ -25,8 +38,11 @@ pub mod decomp_tool {
         /// ellipsoid
         pub ellipsoid: Ellipsoid,
     }
-    impl Decomp {
-        pub fn init(p1: &Vec3, p2: &Vec3) -> Self {
+    impl<T> Decomp<T>
+    where
+        T: Voxelable + Hash + Sized + Send + Clone + Copy + Default,
+    {
+        pub fn init(p1: &Vec3, p2: &Vec3, trans: T) -> Self {
             let r_s = 0.5 * v_max.powi(2) / a_max;
             let d = r_s + r_robot;
             let center = 0.5 * (p1 + p2);
@@ -45,7 +61,17 @@ pub mod decomp_tool {
                 HyperPlane::new(n3, &center, &d),
                 HyperPlane::new(-n3, &center, &d),
             ];
-            let bbox = BoundingBox { hplanes };
+            let vertices: [Vec3; 8] = [
+                &center + &n1 * d + &n2 * d + &n3 * d,
+                &center + &n1 * d + &n2 * d - &n3 * d,
+                &center + &n1 * d - &n2 * d + &n3 * d,
+                &center + &n1 * d - &n2 * d - &n3 * d,
+                &center - &n1 * d + &n2 * d + &n3 * d,
+                &center - &n1 * d + &n2 * d - &n3 * d,
+                &center - &n1 * d - &n2 * d + &n3 * d,
+                &center - &n1 * d - &n2 * d - &n3 * d,
+            ];
+            let bbox = BoundingBox { hplanes, vertices };
             let r = Grp3::from_columns(&[n1, n2, n3]);
             let squared_a_inv = 1.0 / a.powi(2);
             let s = Grp3::from_diagonal(&Vec3::new(squared_a_inv, squared_a_inv, squared_a_inv));
@@ -60,11 +86,57 @@ pub mod decomp_tool {
             };
             let line_ends = [p1.clone(), p2.clone()];
             Self {
+                trans,
                 r_s,
                 line_ends,
                 bbox,
                 ellipsoid,
             }
+        }
+
+        pub fn get_grids_to_check(&self) -> HashSet<(i32, i32, i32)> {
+            let grids = self
+                .bbox
+                .vertices
+                .iter()
+                .map(|vertex| self.trans.coordinate_to_grid(vertex));
+            let (mut i_min, mut i_max, mut j_min, mut j_max, mut k_min, mut k_max) = (
+                std::i32::MAX,
+                std::i32::MIN,
+                std::i32::MAX,
+                std::i32::MIN,
+                std::i32::MAX,
+                std::i32::MIN,
+            );
+            for grid in grids {
+                if grid.0 < i_min {
+                    i_min = grid.0;
+                }
+                if grid.0 > i_max {
+                    i_max = grid.0;
+                }
+                if grid.1 < j_min {
+                    j_min = grid.1;
+                }
+                if grid.1 > j_max {
+                    j_max = grid.1;
+                }
+                if grid.2 < k_min {
+                    k_min = grid.2;
+                }
+                if grid.2 > k_max {
+                    k_max = grid.2;
+                }
+            }
+            let mut check_set: HashSet<(i32, i32, i32)> = HashSet::new();
+            for i in i_min..i_max + 1 {
+                for j in j_min..j_min + 1 {
+                    for k in k_min..k_max + 1 {
+                        let _ = check_set.insert((i, j, k));
+                    }
+                }
+            }
+            check_set
         }
     }
 
@@ -92,6 +164,7 @@ pub mod decomp_tool {
     #[derive(Debug)]
     pub struct BoundingBox {
         pub hplanes: [HyperPlane; 6],
+        pub vertices: [Vec3; 8],
     }
     impl BoundingBox {
         pub fn is_point_inside_bbox(&self, x: &Vec3) -> bool {
