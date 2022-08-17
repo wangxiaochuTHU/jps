@@ -103,14 +103,13 @@ mod tests {
         let mut rng = thread_rng();
         let opoints: Vec<Vec3> = (0..50)
             .into_iter()
-            .map(|_| {
-                &decomp2.bbox.hplanes[3].p
-                    + 0.15
-                        * rng.gen_range(-5f64..-4f64).signum()
+            .map(|i| {
+                &decomp2.bbox.hplanes[2 + i as usize % 4].p
+                    + 0.1
                         * Vec3::new(
-                            rng.gen_range(-3_f64..3f64),
-                            rng.gen_range(-3_f64..3f64),
-                            rng.gen_range(-4_f64..4f64),
+                            rng.gen_range(-0.5_f64..0.5f64),
+                            rng.gen_range(-0.8_f64..0.8f64),
+                            rng.gen_range(-0.5_f64..0.5f64),
                         )
             })
             .collect();
@@ -119,6 +118,7 @@ mod tests {
             .iter()
             .filter(|p| decomp2.ellipsoid.distance(p) < 0.9999)
             .collect();
+
         println!(
             "[Before fitting] ellipsoid a ={}, b ={}, c={}, contains {} opoints",
             decomp2.ellipsoid.a,
@@ -138,5 +138,6 @@ mod tests {
             decomp2.ellipsoid.c,
             distances.len()
         );
+        assert!(distances.len() == 0);
     }
 }
