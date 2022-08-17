@@ -46,15 +46,16 @@ pub mod decomp_tool {
     where
         T: Voxelable + Hash + Sized + Send + Clone + Copy,
     {
+        /// init a Decomp
         pub fn init(
-            p1: &(i32, i32, i32),
-            p2: &(i32, i32, i32),
+            g1: &(i32, i32, i32),
+            g2: &(i32, i32, i32),
             trans: T,
             r_s: f64,
             r_robot: f64,
         ) -> Self {
-            let p1 = trans.grid_to_coordinate(p1);
-            let p2 = trans.grid_to_coordinate(p2);
+            let p1 = trans.grid_to_coordinate(g1);
+            let p2 = trans.grid_to_coordinate(g2);
             let d = r_s + r_robot;
             let center = 0.5 * (&p1 + &p2);
             let line = &p2 - &p1;
@@ -107,7 +108,8 @@ pub mod decomp_tool {
             }
         }
 
-        pub fn get_grids_to_check(
+        /// find which grids need to check
+        pub fn find_grids_to_check(
             &self,
             omap: &HashSet<(i32, i32, i32)>,
         ) -> HashSet<(i32, i32, i32)> {
@@ -157,6 +159,68 @@ pub mod decomp_tool {
             }
             check_set
         }
+
+        /// make the ellipsoid deform, fit for surrounding occupied points.
+        pub fn best_fit_ellipsoid_for_occupied_points(&mut self, mut opoints: Vec<Vec3>) {
+            let (mut k1, mut k2): (Option<usize>, Option<usize>) = (None, None); // two vars to restore index of the found points.
+
+            /* step 1: shrink two axes. */
+            loop {
+                // calculate all distances from the ellipsoid
+                let darray = opoints
+                    .iter()
+                    .enumerate()
+                    .map(|(i, p)| (i, self.ellipsoid.distance(p)));
+                // find the index satisfying: 1) distance less than 0.9999 && 2) with the minimal distance
+                let idx = darray
+                    .filter(|(i, d)| *d < 0.9999)
+                    .min_by(|id1, id2| id1.1.partial_cmp(&id2.1).unwrap());
+                // if found none, finished loop; else, shrink for passing that point and then continue the loop
+                match idx {
+                    None => break,
+                    Some((k, d)) => {
+                        self.ellipsoid.shrink_two_axes_by_point(&opoints[k]); // shrink
+                        k1 = Some(k); // update `k1`
+                    }
+                }
+            }
+            /* step 2: reset the two axes of the ellipsoid*/
+            match k1 {
+                // None means there is no intersected point. in this case, the ellipsoid needs no more adjustments.
+                None => return,
+                // if intersected point exists, reset and find a next intersected point.
+                Some(k) => {
+                    // find direction n3
+                    let op = &opoints[k] - &self.ellipsoid.center;
+                    let op = op.normalize();
+                    let n1 = &self.ellipsoid.r.index((0..3, 0));
+                    let n3 = n1.cross(&op);
+                    // reset
+                    self.ellipsoid.reset_two_axes(n3);
+                }
+            }
+
+            /* step 3: shrink z-axis */
+            loop {
+                // calculate all distances from the ellipsoid
+                let darray = opoints
+                    .iter()
+                    .enumerate()
+                    .map(|(i, p)| (i, self.ellipsoid.distance(p)));
+                // find the index satisfying: 1) distance less than 0.9999 && 2) with the minimal distance
+                let idx = darray
+                    .filter(|(i, d)| *d < 0.9999)
+                    .min_by(|id1, id2| id1.1.partial_cmp(&id2.1).unwrap());
+                // if found none, finished loop; else, shrink for passing that point and then continue the loop
+                match idx {
+                    None => break,
+                    Some((k, d)) => {
+                        self.ellipsoid.shrink_one_axes_by_point(&opoints[k]); // shrink
+                        k2 = Some(k); // update `k2`
+                    }
+                }
+            }
+        }
     }
 
     #[derive(Debug)]
@@ -186,11 +250,11 @@ pub mod decomp_tool {
                 &self.r * Grp3::from_diagonal(&Vec3::new(s0, s_1_2, s_1_2)) * &self.r.transpose();
         }
 
-        /// assign a new axis direction for the y-axis, and reset the z-axis equal to `a`.
-        pub fn reset_two_axes(&mut self, n2: &Vec3) {
+        /// assign a new axis direction for the z-axis, and reset the z-axis equal to `a`.
+        pub fn reset_two_axes(&mut self, n3: Vec3) {
             let n1 = &self.r.index((0..3, 0));
-            let n3 = n1.cross(&n2);
-            self.r.index_mut((0..3, 1)).copy_from(n2);
+            let n2 = n3.cross(n1);
+            self.r.index_mut((0..3, 1)).copy_from(&n2);
             self.r.index_mut((0..3, 2)).copy_from(&n3);
             self.c = self.a;
             self.e = &self.r
@@ -202,7 +266,7 @@ pub mod decomp_tool {
                 * &self.r.transpose();
         }
 
-        /// shrink z-axis (c) simultaneously, such that Point p is on the surface of the ellipsoid.
+        /// shrink z-axis (c), such that Point p is on the surface of the ellipsoid.
         pub fn shrink_one_axes_by_point(&mut self, p: &Vec3) {
             let s0 = 1.0 / self.a.powi(2);
             let s1 = 1.0 / self.b.powi(2);
