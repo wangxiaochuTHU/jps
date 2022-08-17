@@ -54,22 +54,22 @@ pub mod decomp_tool {
             let n2 = find_bbox_dir_y(&n1);
             let n3 = find_bbox_dir_z(&n1, &n2);
             let hplanes: [HyperPlane; 6] = [
-                HyperPlane::new(n1, &center, &d),
-                HyperPlane::new(-n1, &center, &d),
-                HyperPlane::new(n2, &center, &d),
-                HyperPlane::new(-n2, &center, &d),
-                HyperPlane::new(n3, &center, &d),
-                HyperPlane::new(-n3, &center, &d),
+                HyperPlane::new(n1, &center + &n1 * (0.5 * a + d)),
+                HyperPlane::new(-n1, &center - &n1 * (0.5 * a + d)),
+                HyperPlane::new(n2, &center + &n2 * d),
+                HyperPlane::new(-n2, &center - &n2 * d),
+                HyperPlane::new(n3, &center + &n3 * d),
+                HyperPlane::new(-n3, &center - &n3 * d),
             ];
             let vertices: [Vec3; 8] = [
-                &center + &n1 * d + &n2 * d + &n3 * d,
-                &center + &n1 * d + &n2 * d - &n3 * d,
-                &center + &n1 * d - &n2 * d + &n3 * d,
-                &center + &n1 * d - &n2 * d - &n3 * d,
-                &center - &n1 * d + &n2 * d + &n3 * d,
-                &center - &n1 * d + &n2 * d - &n3 * d,
-                &center - &n1 * d - &n2 * d + &n3 * d,
-                &center - &n1 * d - &n2 * d - &n3 * d,
+                &center + &n1 * (0.5 * a + d) + &n2 * d + &n3 * d,
+                &center + &n1 * (0.5 * a + d) + &n2 * d - &n3 * d,
+                &center + &n1 * (0.5 * a + d) - &n2 * d + &n3 * d,
+                &center + &n1 * (0.5 * a + d) - &n2 * d - &n3 * d,
+                &center - &n1 * (0.5 * a + d) + &n2 * d + &n3 * d,
+                &center - &n1 * (0.5 * a + d) + &n2 * d - &n3 * d,
+                &center - &n1 * (0.5 * a + d) - &n2 * d + &n3 * d,
+                &center - &n1 * (0.5 * a + d) - &n2 * d - &n3 * d,
             ];
             let bbox = BoundingBox { hplanes, vertices };
             let r = Grp3::from_columns(&[n1, n2, n3]);
@@ -182,11 +182,8 @@ pub mod decomp_tool {
         pub p: Vec3,
     }
     impl HyperPlane {
-        pub fn new(n: Vec3, center: &Vec3, d: &f64) -> Self {
-            Self {
-                n: n,
-                p: center + &n * *d,
-            }
+        pub fn new(n: Vec3, p: Vec3) -> Self {
+            Self { n, p }
         }
     }
 
