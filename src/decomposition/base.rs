@@ -226,6 +226,90 @@ pub mod decomp_tool {
             }
             return (k1, k2);
         }
+
+        /// check if Point p is on the same side
+        #[inline]
+        pub fn is_at_inner_side(p: &Vec3, polys: &Vec<HyperPlane>) -> bool {
+            for hp in polys.iter() {
+                if hp.n.dot(&(p - &hp.p)) >= -1e-4 {
+                    return false;
+                }
+            }
+            true
+        }
+
+        /// cut the space surrounding the ellipsoid
+        pub fn cut_into_polyhedron(
+            &mut self,
+            mut opoints: Vec<Vec3>,
+            k1: Option<usize>,
+            k2: Option<usize>,
+            r_robot: f64,
+        ) {
+            let block = &self.ellipsoid.e + &self.ellipsoid.e.transpose();
+            // add hyperplane by k1
+            if let Some(k) = k1 {
+                let p = opoints[k];
+                let n = &block * (&p - &self.ellipsoid.center);
+                let n = n.normalize();
+                self.polyhedron.push(HyperPlane { n, p });
+            }
+            // add hyperplane by k2
+            if let Some(k) = k2 {
+                let p = opoints[k];
+                let n = &block * (&p - &self.ellipsoid.center);
+                let n = n.normalize();
+                self.polyhedron.push(HyperPlane { n, p });
+            }
+
+            // remove from `opoints` those points that are on the oppsite side w.r.t k1 and k2 hyperplanes
+            opoints.retain(|p| Self::is_at_inner_side(p, &self.polyhedron));
+            loop {
+                // calculate all distances from the ellipsoid
+                let darray = opoints
+                    .iter()
+                    .enumerate()
+                    .map(|(i, p)| (i, self.ellipsoid.distance(p)));
+                // find the index satisfying: 1) distance more than 1.0001 && 2) with the minimal distance
+                let idx = darray
+                    .filter(|(i, d)| *d > 1.0001)
+                    .min_by(|id1, id2| id1.1.partial_cmp(&id2.1).unwrap());
+                // if found none, finished loop; else, dilate for passing that point and then continue the loop
+                match idx {
+                    None => break,
+                    Some((k, d)) => {
+                        self.ellipsoid.dilate_by_point(&opoints[k]); // dilate
+
+                        // add the hyperplane
+                        let block = &self.ellipsoid.e + &self.ellipsoid.e.transpose();
+                        let p = opoints[k];
+                        let n = &block * (&p - &self.ellipsoid.center);
+                        let n = n.normalize();
+                        self.polyhedron.push(HyperPlane { n, p });
+
+                        // remove from `opoints` those points that are on the oppsite side
+                        opoints.retain(|p| Self::is_at_inner_side(p, &self.polyhedron));
+                    }
+                }
+            }
+
+            // adjust hyperplane to ensure minimal distance to the Line >= r_robot
+            let line_dir = &self.line_ends[1] - &self.line_ends[0];
+            let line_dir = line_dir.normalize();
+            for hp in self.polyhedron.iter_mut() {
+                let d1 = ((&self.line_ends[0] - &hp.p).dot(&hp.n)).abs();
+                let d2 = ((&self.line_ends[1] - &hp.p).dot(&hp.n)).abs();
+                let cos_angle = (&line_dir).dot(&hp.n);
+                if (d1 < r_robot || d2 < r_robot) && cos_angle.abs() > 1e-4 {
+                    let t = &hp.n - cos_angle * line_dir;
+                    let mut t = t.normalize();
+                    if t.dot(&hp.n).is_sign_negative() {
+                        t = -t;
+                    }
+                    hp.n = t;
+                }
+            }
+        }
     }
 
     #[derive(Debug, Clone, Copy)]
@@ -281,6 +365,21 @@ pub mod decomp_tool {
             self.c = new_c;
 
             self.e = &self.r * Grp3::from_diagonal(&Vec3::new(s0, s1, s2)) * &self.r.transpose();
+        }
+
+        /// dilate all three axes (a,b,c), such that Point p is on the surface of the ellipsoid.
+        pub fn dilate_by_point(&mut self, p: &Vec3) {
+            let s0 = 1.0 / self.a.powi(2);
+            let s1 = 1.0 / self.b.powi(2);
+            let s2 = 1.0 / self.c.powi(2);
+            let y = self.r.transpose() * (p - &self.center);
+            let β = y[0].powi(2) * s0 + y[1].powi(2) * s1 + y[2].powi(2) * s2;
+
+            let s = Grp3::from_diagonal(&Vec3::new(s0 / β, s1 / β, s2 / β));
+            self.e = &self.r * s * &self.r.transpose();
+            self.a *= β.sqrt();
+            self.b *= β.sqrt();
+            self.c *= β.sqrt();
         }
 
         /// check whether Point p is inside the ellipsoid

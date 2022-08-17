@@ -101,7 +101,7 @@ mod tests {
 
         // generate 50 random occupied points around the center
         let mut rng = thread_rng();
-        let opoints: Vec<Vec3> = (0..50)
+        let mut opoints: Vec<Vec3> = (0..50)
             .into_iter()
             .map(|i| {
                 &decomp2.bbox.hplanes[2 + i as usize % 4].p
@@ -113,6 +113,7 @@ mod tests {
                         )
             })
             .collect();
+
         // test fit the ellipsoid
         let distances: Vec<&Vec3> = opoints
             .iter()
@@ -126,11 +127,14 @@ mod tests {
             decomp2.ellipsoid.c,
             distances.len()
         );
-        decomp2.best_fit_ellipsoid_for_occupied_points(&opoints);
+        let t_start = std::time::Instant::now();
+        let (k1, k2) = decomp2.best_fit_ellipsoid_for_occupied_points(&opoints);
+        let t_end = std::time::Instant::now();
         let distances: Vec<&Vec3> = opoints
             .iter()
             .filter(|p| decomp2.ellipsoid.distance(p) < 0.9999)
             .collect();
+        println!("cost {} us to fit", (t_end - t_start).as_secs_f64() * 1e6);
         println!(
             "[After fitting] ellipsoid a ={}, b ={}, c={}, contains {} opoints",
             decomp2.ellipsoid.a,
@@ -139,5 +143,24 @@ mod tests {
             distances.len()
         );
         assert!(distances.len() == 0);
+
+        // cut_into_polyhedron
+        println!(
+            "[Before cutting] polyhedron has {} hyperplanes",
+            decomp2.polyhedron.len(),
+        );
+        decomp2.cut_into_polyhedron(opoints, k1, k2, r_robot);
+        println!(
+            "[After cutting] polyhedron has {} hyperplanes",
+            decomp2.polyhedron.len(),
+        );
+        // the center of the ellipsoid should be inside the polyhedron
+        assert_eq!(
+            Decomp::<&Transformer>::is_at_inner_side(
+                &decomp2.ellipsoid.center,
+                &decomp2.polyhedron
+            ),
+            true
+        );
     }
 }
