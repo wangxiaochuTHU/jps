@@ -5,6 +5,7 @@ mod tests {
         self, find_perpendicular_direction, find_third_direction, get_attitude_from_one_vector,
         Grp3, Vec3,
     };
+
     #[test]
     fn test_find_n2() {
         let mut n1 = Vec3::new(0.0, 5.0, -3.0);
@@ -35,6 +36,7 @@ mod tests {
     #[test]
     fn test_decomp_init() {
         use crate::decomp_tool::{Decomp, Voxelable};
+        use rand::prelude::*;
         #[derive(Debug, Hash, Clone, Copy)]
         pub struct Transformer {}
         impl Voxelable for &Transformer {
@@ -64,6 +66,8 @@ mod tests {
         let grid_end_1 = (5, -2, 6);
         let grid_end_2 = (8, 1, 9);
         let mut decomp = Decomp::init(&grid_end_1, &grid_end_2, &trans, r_s, r_robot);
+        let mut decomp2 = decomp.clone();
+
         println!("decomp.bbox.vertices = {:?}", decomp.bbox.vertices);
         println!("decomp.bbox.hplanes.n = ");
         for h in decomp.bbox.hplanes.iter() {
@@ -94,5 +98,45 @@ mod tests {
         );
         assert!((decomp.ellipsoid.distance(&p1) - 1.0).abs() < 1e-5);
         assert_eq!(decomp.ellipsoid.contains(&p1), false);
+
+        // generate 50 random occupied points around the center
+        let mut rng = thread_rng();
+        let opoints: Vec<Vec3> = (0..50)
+            .into_iter()
+            .map(|_| {
+                &decomp2.bbox.hplanes[3].p
+                    + 0.15
+                        * rng.gen_range(-5f64..-4f64).signum()
+                        * Vec3::new(
+                            rng.gen_range(-3_f64..3f64),
+                            rng.gen_range(-3_f64..3f64),
+                            rng.gen_range(-4_f64..4f64),
+                        )
+            })
+            .collect();
+        // test fit the ellipsoid
+        let distances: Vec<&Vec3> = opoints
+            .iter()
+            .filter(|p| decomp2.ellipsoid.distance(p) < 0.9999)
+            .collect();
+        println!(
+            "[Before fitting] ellipsoid a ={}, b ={}, c={}, contains {} opoints",
+            decomp2.ellipsoid.a,
+            decomp2.ellipsoid.b,
+            decomp2.ellipsoid.c,
+            distances.len()
+        );
+        decomp2.best_fit_ellipsoid_for_occupied_points(&opoints);
+        let distances: Vec<&Vec3> = opoints
+            .iter()
+            .filter(|p| decomp2.ellipsoid.distance(p) < 0.9999)
+            .collect();
+        println!(
+            "[After fitting] ellipsoid a ={}, b ={}, c={}, contains {} opoints",
+            decomp2.ellipsoid.a,
+            decomp2.ellipsoid.b,
+            decomp2.ellipsoid.c,
+            distances.len()
+        );
     }
 }

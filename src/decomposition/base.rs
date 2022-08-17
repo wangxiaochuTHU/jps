@@ -23,7 +23,7 @@ pub mod decomp_tool {
             unimplemented!();
         }
     }
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     pub struct Decomp<T: Voxelable + Hash + Sized + Send + Clone + Copy> {
         /// an object that can provide methods to transform physical coordinates and voxelized grids.
         pub trans: T,
@@ -160,8 +160,11 @@ pub mod decomp_tool {
             check_set
         }
 
-        /// make the ellipsoid deform, fit for surrounding occupied points.
-        pub fn best_fit_ellipsoid_for_occupied_points(&mut self, mut opoints: Vec<Vec3>) {
+        /// make the ellipsoid keep deforming to fit for surrounding occupied points, until finished
+        pub fn best_fit_ellipsoid_for_occupied_points(
+            &mut self,
+            opoints: &Vec<Vec3>,
+        ) -> (Option<usize>, Option<usize>) {
             let (mut k1, mut k2): (Option<usize>, Option<usize>) = (None, None); // two vars to restore index of the found points.
 
             /* step 1: shrink two axes. */
@@ -181,13 +184,14 @@ pub mod decomp_tool {
                     Some((k, d)) => {
                         self.ellipsoid.shrink_two_axes_by_point(&opoints[k]); // shrink
                         k1 = Some(k); // update `k1`
+                                      // println!("d = {}", d);
                     }
                 }
             }
             /* step 2: reset the two axes of the ellipsoid*/
             match k1 {
                 // None means there is no intersected point. in this case, the ellipsoid needs no more adjustments.
-                None => return,
+                None => return (k1, k2),
                 // if intersected point exists, reset and find a next intersected point.
                 Some(k) => {
                     // find direction n3
@@ -220,10 +224,11 @@ pub mod decomp_tool {
                     }
                 }
             }
+            return (k1, k2);
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, Clone, Copy)]
     pub struct Ellipsoid {
         /// center of the ellipsoid
         pub center: Vec3,
@@ -301,7 +306,7 @@ pub mod decomp_tool {
     /// normal `n`: [nx,ny,nz]' , point `p`: [x0,y0,z0]'
     ///
     /// matrix form is: n' (x - p) = 0, half-plane on the center's side meets: n' (x - p) < 0
-    #[derive(Debug)]
+    #[derive(Debug, Clone, Copy)]
     pub struct BoundingBox {
         pub hplanes: [HyperPlane; 6],
         pub vertices: [Vec3; 8],
@@ -316,7 +321,7 @@ pub mod decomp_tool {
             true
         }
     }
-    #[derive(Debug)]
+    #[derive(Debug, Clone, Copy)]
     pub struct HyperPlane {
         pub n: Vec3,
         pub p: Vec3,
