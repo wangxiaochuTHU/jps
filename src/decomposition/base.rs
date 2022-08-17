@@ -8,9 +8,9 @@ pub mod decomp_tool {
     use itertools::Itertools;
     pub use yakf::kf::{self, so3::SO3, Grp3, Vec3};
     // pub use yakf::linalg::*;
-    pub const a_max: f64 = 10.0;
-    pub const v_max: f64 = 5.0;
-    pub const r_robot: f64 = 0.2;
+    // pub const a_max: f64 = 10.0;
+    // pub const v_max: f64 = 5.0;
+    // pub const r_robot: f64 = 0.2;
 
     pub trait Voxelable {
         fn coordinate_to_grid(&self, pos: &Vec3) -> (i32, i32, i32) {
@@ -46,10 +46,15 @@ pub mod decomp_tool {
     where
         T: Voxelable + Hash + Sized + Send + Clone + Copy,
     {
-        pub fn init(p1: &(i32, i32, i32), p2: &(i32, i32, i32), trans: T) -> Self {
+        pub fn init(
+            p1: &(i32, i32, i32),
+            p2: &(i32, i32, i32),
+            trans: T,
+            r_s: f64,
+            r_robot: f64,
+        ) -> Self {
             let p1 = trans.grid_to_coordinate(p1);
             let p2 = trans.grid_to_coordinate(p2);
-            let r_s = 0.5 * v_max.powi(2) / a_max;
             let d = r_s + r_robot;
             let center = 0.5 * (&p1 + &p2);
             let line = &p2 - &p1;
@@ -197,6 +202,18 @@ pub mod decomp_tool {
                 * &self.r.transpose();
         }
 
+        /// shrink z-axis (c) simultaneously, such that Point p is on the surface of the ellipsoid.
+        pub fn shrink_one_axes_by_point(&mut self, p: &Vec3) {
+            let s0 = 1.0 / self.a.powi(2);
+            let s1 = 1.0 / self.b.powi(2);
+            let y = self.r.transpose() * (p - &self.center);
+            let s2 = (1.0 - y[0].powi(2) * s0 - y[1].powi(2) * s1) / y[2].powi(2);
+            let new_c = 1.0 / s2.sqrt();
+            self.c = new_c;
+
+            self.e = &self.r * Grp3::from_diagonal(&Vec3::new(s0, s1, s2)) * &self.r.transpose();
+        }
+
         /// check whether Point p is inside the ellipsoid
         pub fn contains(&self, p: &Vec3) -> bool {
             if self.distance(p) < 0.9999 {
@@ -219,7 +236,7 @@ pub mod decomp_tool {
     ///
     /// normal `n`: [nx,ny,nz]' , point `p`: [x0,y0,z0]'
     ///
-    /// matrix form: n' (x - p) = 0, half-plane on the center's side: n' (x - p) < 0
+    /// matrix form is: n' (x - p) = 0, half-plane on the center's side meets: n' (x - p) < 0
     #[derive(Debug)]
     pub struct BoundingBox {
         pub hplanes: [HyperPlane; 6],

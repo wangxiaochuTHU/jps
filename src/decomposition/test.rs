@@ -30,7 +30,7 @@ mod tests {
         assert!(((r.transpose() * r - Grp3::identity()).norm() < 1e-7));
     }
 
-    /// This test outputs some vectors for manual check
+    /// This test also outputs some vectors for manual check
     #[cfg(feature = "decomp")]
     #[test]
     fn test_decomp_init() {
@@ -56,10 +56,14 @@ mod tests {
                 (0.55, 0.45, 0.6)
             }
         }
+        let a_max: f64 = 10.0;
+        let v_max: f64 = 5.0;
+        let r_robot: f64 = 0.2;
+        let r_s = 0.5 * v_max.powi(2) / a_max;
         let trans = Transformer {};
         let grid_end_1 = (5, -2, 6);
         let grid_end_2 = (8, 1, 9);
-        let mut decomp = Decomp::init(&grid_end_1, &grid_end_2, &trans);
+        let mut decomp = Decomp::init(&grid_end_1, &grid_end_2, &trans, r_s, r_robot);
         println!("decomp.bbox.vertices = {:?}", decomp.bbox.vertices);
         println!("decomp.bbox.hplanes.n = ");
         for h in decomp.bbox.hplanes.iter() {
@@ -85,8 +89,10 @@ mod tests {
             decomp.ellipsoid.distance(&p1),
         );
         println!(
-            "[After shrinking] ellipsoid contains p1?  {}",
+            "[After shrinking] ellipsoid strictly contains p1?  {}",
             decomp.ellipsoid.contains(&p1),
         );
+        assert!((decomp.ellipsoid.distance(&p1) - 1.0).abs() < 1e-5);
+        assert_eq!(decomp.ellipsoid.contains(&p1), false);
     }
 }
