@@ -42,11 +42,13 @@ pub mod decomp_tool {
     where
         T: Voxelable + Hash + Sized + Send + Clone + Copy + Default,
     {
-        pub fn init(p1: &Vec3, p2: &Vec3, trans: T) -> Self {
+        pub fn init(p1: &(i32, i32, i32), p2: &(i32, i32, i32), trans: T) -> Self {
+            let p1 = trans.grid_to_coordinate(p1);
+            let p2 = trans.grid_to_coordinate(p2);
             let r_s = 0.5 * v_max.powi(2) / a_max;
             let d = r_s + r_robot;
-            let center = 0.5 * (p1 + p2);
-            let line = p2 - p1;
+            let center = 0.5 * (&p1 + &p2);
+            let line = &p2 - &p1;
             let a = line.norm();
             let b = a;
             let c = a;
@@ -84,7 +86,7 @@ pub mod decomp_tool {
                 c,
                 e,
             };
-            let line_ends = [p1.clone(), p2.clone()];
+            let line_ends = [p1, p2];
             Self {
                 trans,
                 r_s,
@@ -94,7 +96,10 @@ pub mod decomp_tool {
             }
         }
 
-        pub fn get_grids_to_check(&self) -> HashSet<(i32, i32, i32)> {
+        pub fn get_grids_to_check(
+            &self,
+            omap: &HashSet<(i32, i32, i32)>,
+        ) -> HashSet<(i32, i32, i32)> {
             let grids = self
                 .bbox
                 .vertices
@@ -132,7 +137,10 @@ pub mod decomp_tool {
             for i in i_min..i_max + 1 {
                 for j in j_min..j_min + 1 {
                     for k in k_min..k_max + 1 {
-                        let _ = check_set.insert((i, j, k));
+                        let grid = (i, j, k);
+                        if omap.contains(&grid) {
+                            let _ = check_set.insert(grid);
+                        }
                     }
                 }
             }
