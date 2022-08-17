@@ -24,7 +24,8 @@ pub mod decomp_tool {
         }
     }
     #[derive(Debug)]
-    pub struct Decomp<T: Voxelable + Hash + Sized + Send + Clone + Copy + Default> {
+    pub struct Decomp<T: Voxelable + Hash + Sized + Send + Clone + Copy> {
+        /// an object that can provide methods to transform physical coordinates and voxelized grids.
         pub trans: T,
         /// radius of safe flight,  r_s = v_max^2/(2*a_max)
         pub r_s: f64,
@@ -37,10 +38,13 @@ pub mod decomp_tool {
 
         /// ellipsoid
         pub ellipsoid: Ellipsoid,
+
+        /// polyhedron, defined by a serials of HyperPlanes
+        pub polyhedron: Vec<HyperPlane>,
     }
     impl<T> Decomp<T>
     where
-        T: Voxelable + Hash + Sized + Send + Clone + Copy + Default,
+        T: Voxelable + Hash + Sized + Send + Clone + Copy,
     {
         pub fn init(p1: &(i32, i32, i32), p2: &(i32, i32, i32), trans: T) -> Self {
             let p1 = trans.grid_to_coordinate(p1);
@@ -87,12 +91,14 @@ pub mod decomp_tool {
                 e,
             };
             let line_ends = [p1, p2];
+            let polyhedron: Vec<HyperPlane> = Vec::new();
             Self {
                 trans,
                 r_s,
                 line_ends,
                 bbox,
                 ellipsoid,
+                polyhedron,
             }
         }
 
@@ -161,6 +167,51 @@ pub mod decomp_tool {
         /// matrix e = r*S*r'
         pub e: Grp3,
     }
+    impl Ellipsoid {
+        /// shrink two axes (b,c) simultaneously, such that Point p is on the surface of the ellipsoid.
+        pub fn shrink_two_axes_by_point(&mut self, p: &Vec3) {
+            let s0 = 1.0 / self.a.powi(2);
+            let y = self.r.transpose() * (p - &self.center);
+            let s_1_2 = (1.0 - y[0].powi(2) * s0) / (y[1].powi(2) + y[2].powi(2));
+            let new_b = 1.0 / s_1_2.sqrt();
+            self.b = new_b;
+            self.c = new_b;
+
+            self.e =
+                &self.r * Grp3::from_diagonal(&Vec3::new(s0, s_1_2, s_1_2)) * &self.r.transpose();
+        }
+
+        /// assign a new axis direction for the y-axis, and reset the z-axis equal to `a`.
+        pub fn reset_two_axes(&mut self, n2: &Vec3) {
+            let n1 = &self.r.index((0..3, 0));
+            let n3 = n1.cross(&n2);
+            self.r.index_mut((0..3, 1)).copy_from(n2);
+            self.r.index_mut((0..3, 2)).copy_from(&n3);
+            self.c = self.a;
+            self.e = &self.r
+                * Grp3::from_diagonal(&Vec3::new(
+                    1.0 / self.a.powi(2),
+                    1.0 / self.b.powi(2),
+                    1.0 / self.c.powi(2),
+                ))
+                * &self.r.transpose();
+        }
+
+        /// check whether Point p is inside the ellipsoid
+        pub fn contains(&self, p: &Vec3) -> bool {
+            if self.distance(p) < 0.9999 {
+                true
+            } else {
+                false
+            }
+        }
+        #[inline]
+        pub fn distance(&self, p: &Vec3) -> f64 {
+            let dp = p - &self.center;
+            let d = dp.transpose() * &self.e * &dp;
+            d[0]
+        }
+    }
 
     /// BoundingBox is defined by 6 planes.
     ///
@@ -192,14 +243,6 @@ pub mod decomp_tool {
     impl HyperPlane {
         pub fn new(n: Vec3, p: Vec3) -> Self {
             Self { n, p }
-        }
-    }
-
-    impl Ellipsoid {
-        pub fn distance(&self, p: &Vec3) -> f64 {
-            let dp = p - &self.center;
-            let d = dp.transpose() * &self.e * &dp;
-            d[0]
         }
     }
 
