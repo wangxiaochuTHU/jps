@@ -305,6 +305,8 @@ pub mod decomp_tool {
                     }
                 }
             }
+            // finally, put the 6 hyperplanes that the bbox holds into polyhedron.
+            self.polyhedron.extend(self.bbox.hplanes.into_iter());
 
             // // adjust hyperplane to ensure minimal distance to the Line >= r_robot
             // let line_dir = &self.line_ends[1] - &self.line_ends[0];
