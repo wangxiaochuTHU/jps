@@ -213,7 +213,7 @@ pub mod decomp_tool {
                     let n1 = &self.ellipsoid.r.index((0..3, 0));
                     let n3 = n1.cross(&op);
                     // reset
-                    self.ellipsoid.reset_two_axes(n3);
+                    self.ellipsoid.reset_two_axes(n3, &opoints[kk1]);
                 }
             }
 
@@ -353,14 +353,27 @@ pub mod decomp_tool {
         }
 
         /// assign a new axis direction for the z-axis, and reset the z-axis equal to `a`.
-        pub fn reset_two_axes(&mut self, n3: Vec3) {
-            println!("-------r = {:.4?}", self.r);
+        pub fn reset_two_axes(&mut self, n3: Vec3, p: &Vec3) {
+            // println!("-------r = {:.4?}", self.r);
             let n1 = &self.r.index((0..3, 0));
             let n2 = n3.cross(n1);
             self.r.index_mut((0..3, 1)).copy_from(&n2);
             self.r.index_mut((0..3, 2)).copy_from(&n3);
-            println!("+++++++r = {:.4?}", self.r);
+            // println!("+++++++r = {:.4?}", self.r);
+            self.b = self.a;
+            self.c = self.b;
+
             // // self.c = self.a;
+            self.e = &self.r
+                * Grp3::from_diagonal(&Vec3::new(
+                    1.0 / self.a.powi(2),
+                    1.0 / self.b.powi(2),
+                    1.0 / self.c.powi(2),
+                ))
+                * &self.r.transpose();
+            self.shrink_two_axes_by_point(p);
+            // reset c
+            self.c = self.a;
             self.e = &self.r
                 * Grp3::from_diagonal(&Vec3::new(
                     1.0 / self.a.powi(2),
@@ -379,7 +392,7 @@ pub mod decomp_tool {
             let s2 = (1.0 - y[0].powi(2) * s0 - y[1].powi(2) * s1) / y[2].powi(2);
             let new_c = 1.0 / s2.sqrt();
             self.c = new_c;
-
+            println!("second=================");
             if new_c < 0.001 {
                 println!("");
                 println!(
