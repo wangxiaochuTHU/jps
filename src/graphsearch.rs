@@ -50,9 +50,9 @@ pub struct GraphSearch {
     /// occupied map
     pub omap_: HashSet<(i32, i32, i32)>,
     /// x-, y-, z- dimensions
-    pub xdim: i32,
-    pub ydim: i32,
-    pub zdim: i32,
+    pub xbound: [i32; 2],
+    pub ybound: [i32; 2],
+    pub zbound: [i32; 2],
 
     /// a scalar in calculating the costs
     pub(crate) eps_: f32,
@@ -81,9 +81,9 @@ impl GraphSearch {
     pub fn new_v1(
         fmap_: Option<HashSet<(i32, i32, i32)>>,
         omap_: HashSet<(i32, i32, i32)>,
-        xdim: i32,
-        ydim: i32,
-        zdim: i32,
+        xbound: [i32; 2],
+        ybound: [i32; 2],
+        zbound: [i32; 2],
         eps_: f32,
         // goal: (i32, i32, i32),
         // use_jps_: bool,
@@ -110,9 +110,9 @@ impl GraphSearch {
             jn3d_: JPS3DNeib::default(),
             fmap_: fmap_,
             omap_: omap_,
-            xdim: xdim,
-            ydim: ydim,
-            zdim: zdim,
+            xbound: xbound,
+            ybound: ybound,
+            zbound: zbound,
             eps_: eps_,
             ..Default::default() // goal: goal,
                                  // use_jps_: use_jps_,
@@ -133,9 +133,9 @@ impl GraphSearch {
     ///
     pub fn new_v2(
         map: &[bool],
-        xdim: i32,
-        ydim: i32,
-        zdim: i32,
+        xbound: [i32; 2],
+        ybound: [i32; 2],
+        zbound: [i32; 2],
         eps_: f32,
         // goal: (i32, i32, i32),
         // use_jps_: bool,
@@ -155,7 +155,7 @@ impl GraphSearch {
                 free_set.insert((x, y, z));
             }
         }
-        Self::new_v1(Some(free_set), occ_set, xdim, ydim, zdim, eps_)
+        Self::new_v1(Some(free_set), occ_set, xbound, ybound, zbound, eps_)
     }
 }
 
@@ -511,12 +511,12 @@ impl GraphSearch {
     #[inline]
     pub(crate) fn is_free(&self, pos: &(i32, i32, i32)) -> bool {
         let is_inside = || {
-            pos.0 >= 0
-                && pos.0 < self.xdim
-                && pos.1 >= 0
-                && pos.1 < self.ydim
-                && pos.2 >= 0
-                && pos.2 < self.zdim
+            pos.0 >= self.xbound[0]
+                && pos.0 < self.xbound[1]
+                && pos.1 >= self.ybound[0]
+                && pos.1 < self.ybound[1]
+                && pos.2 >= self.zbound[0]
+                && pos.2 < self.zbound[1]
         };
         match self.fmap_.as_ref() {
             Some(fmap) => fmap.contains(&pos) && is_inside(),
@@ -526,12 +526,12 @@ impl GraphSearch {
 
     #[inline]
     pub(crate) fn is_occupied(&self, pos: &(i32, i32, i32)) -> bool {
-        pos.0 >= 0
-            && pos.0 < self.xdim
-            && pos.1 >= 0
-            && pos.1 < self.ydim
-            && pos.2 >= 0
-            && pos.2 < self.zdim
+        pos.0 >= self.xbound[0]
+            && pos.0 < self.xbound[1]
+            && pos.1 >= self.ybound[0]
+            && pos.1 < self.ybound[1]
+            && pos.2 >= self.zbound[0]
+            && pos.2 < self.zbound[1]
             && self.omap_.contains(&pos)
     }
 

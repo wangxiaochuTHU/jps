@@ -4,8 +4,8 @@
 pub mod decomp_tool {
     use std::hash::Hash;
 
-    use im::HashSet;
     use itertools::Itertools;
+    use std::collections::HashSet;
     pub use yakf::kf::{self, so3::SO3, Grp3, Vec3};
     // pub use yakf::linalg::*;
     // pub const a_max: f64 = 10.0;
@@ -161,9 +161,10 @@ pub mod decomp_tool {
         }
 
         /// inflate obstacles by a distance.
-        /// Currently, move the obstable towards the center of the ellipsoid by a distance.
+        /// Currently, the method is to move the obstable towards the center of the ellipsoid by a distance.
         /// But I feel this would not be exact for a part of the points.
-        /// TODO: how to efficiently inflate?
+        ///
+        /// TODO: how to exactly and efficiently inflate? I think inflation should be done before path finding.
         pub fn inflate_obstacles(&self, opoints: &mut Vec<Vec3>, inflate_distance: f64) {
             for p in opoints.iter_mut() {
                 let dir_cp = *p - self.ellipsoid.center;
@@ -205,9 +206,9 @@ pub mod decomp_tool {
                 // None means there is no intersected point. in this case, the ellipsoid needs no more adjustments.
                 None => return (k1, k2),
                 // if intersected point exists, reset and find a next intersected point.
-                Some(k) => {
+                Some(kk1) => {
                     // find direction n3
-                    let op = &opoints[k] - &self.ellipsoid.center;
+                    let op = &opoints[kk1] - &self.ellipsoid.center;
                     let op = op.normalize();
                     let n1 = &self.ellipsoid.r.index((0..3, 0));
                     let n3 = n1.cross(&op);
@@ -225,7 +226,7 @@ pub mod decomp_tool {
                     .map(|(i, p)| (i, self.ellipsoid.distance(p)));
                 // find the index satisfying: 1) distance less than 0.9999 && 2) with the minimal distance
                 let idx = darray
-                    .filter(|(i, d)| *d < 0.9999)
+                    .filter(|(i, d)| *d < 0.999)
                     .min_by(|id1, id2| id1.1.partial_cmp(&id2.1).unwrap());
                 // if found none, finished loop; else, shrink for passing that point and then continue the loop
                 match idx {
@@ -353,11 +354,13 @@ pub mod decomp_tool {
 
         /// assign a new axis direction for the z-axis, and reset the z-axis equal to `a`.
         pub fn reset_two_axes(&mut self, n3: Vec3) {
+            println!("-------r = {:.4?}", self.r);
             let n1 = &self.r.index((0..3, 0));
             let n2 = n3.cross(n1);
             self.r.index_mut((0..3, 1)).copy_from(&n2);
             self.r.index_mut((0..3, 2)).copy_from(&n3);
-            self.c = self.a;
+            println!("+++++++r = {:.4?}", self.r);
+            // // self.c = self.a;
             self.e = &self.r
                 * Grp3::from_diagonal(&Vec3::new(
                     1.0 / self.a.powi(2),
@@ -372,11 +375,28 @@ pub mod decomp_tool {
             let s0 = 1.0 / self.a.powi(2);
             let s1 = 1.0 / self.b.powi(2);
             let y = self.r.transpose() * (p - &self.center);
+            // considering a special case, where y[2] = 0
             let s2 = (1.0 - y[0].powi(2) * s0 - y[1].powi(2) * s1) / y[2].powi(2);
             let new_c = 1.0 / s2.sqrt();
             self.c = new_c;
 
+            if new_c < 0.001 {
+                println!("");
+                println!(
+                    "center = {:.4?}, p = {:.4?}, p-c = {:.4?}, d = {:.4?}, y2 = {:.?}, ellip = {:.4?}",
+                    self.center,
+                    p,
+                    p - self.center,
+                    self.distance(p),
+                    y[2],
+                    self
+                );
+                // println!("");
+            }
+
             self.e = &self.r * Grp3::from_diagonal(&Vec3::new(s0, s1, s2)) * &self.r.transpose();
+            println!("new d = {:.4?}", self.distance(p));
+            println!("");
         }
 
         /// dilate all three axes (a,b,c), such that Point p is on the surface of the ellipsoid.
@@ -406,7 +426,7 @@ pub mod decomp_tool {
         pub fn distance(&self, p: &Vec3) -> f64 {
             let dp = p - &self.center;
             let d = dp.transpose() * &self.e * &dp;
-            d[0]
+            d[0].abs()
         }
     }
 
