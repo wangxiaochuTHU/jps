@@ -128,6 +128,7 @@ mod tests {
             distances.len()
         );
         let t_start = std::time::Instant::now();
+        decomp2.inflate_obstacles(&mut opoints, r_robot); // inflate_obstacles
         let (k1, k2) = decomp2.best_fit_ellipsoid_for_occupied_points(&opoints);
         let t_end = std::time::Instant::now();
         let distances: Vec<&Vec3> = opoints

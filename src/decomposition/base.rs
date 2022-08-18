@@ -160,6 +160,18 @@ pub mod decomp_tool {
             check_set
         }
 
+        /// inflate obstacles by a distance.
+        /// Currently, move the obstable towards the center of the ellipsoid by a distance.
+        /// But I feel this would not be exact for a part of the points.
+        /// TODO: how to efficiently inflate?
+        pub fn inflate_obstacles(&self, opoints: &mut Vec<Vec3>, inflate_distance: f64) {
+            for p in opoints.iter_mut() {
+                let dir_cp = *p - self.ellipsoid.center;
+                let dir_cp = dir_cp.normalize();
+                *p = *p - dir_cp * inflate_distance;
+            }
+        }
+
         /// make the ellipsoid keep deforming to fit for surrounding occupied points, until finished
         pub fn best_fit_ellipsoid_for_occupied_points(
             &mut self,
@@ -293,22 +305,22 @@ pub mod decomp_tool {
                 }
             }
 
-            // adjust hyperplane to ensure minimal distance to the Line >= r_robot
-            let line_dir = &self.line_ends[1] - &self.line_ends[0];
-            let line_dir = line_dir.normalize();
-            for hp in self.polyhedron.iter_mut() {
-                let d1 = ((&self.line_ends[0] - &hp.p).dot(&hp.n)).abs();
-                let d2 = ((&self.line_ends[1] - &hp.p).dot(&hp.n)).abs();
-                let cos_angle = (&line_dir).dot(&hp.n);
-                if (d1 < r_robot || d2 < r_robot) && cos_angle.abs() > 1e-4 {
-                    let t = &hp.n - cos_angle * line_dir;
-                    let mut t = t.normalize();
-                    if t.dot(&hp.n).is_sign_negative() {
-                        t = -t;
-                    }
-                    hp.n = t;
-                }
-            }
+            // // adjust hyperplane to ensure minimal distance to the Line >= r_robot
+            // let line_dir = &self.line_ends[1] - &self.line_ends[0];
+            // let line_dir = line_dir.normalize();
+            // for hp in self.polyhedron.iter_mut() {
+            //     let d1 = ((&self.line_ends[0] - &hp.p).dot(&hp.n)).abs();
+            //     let d2 = ((&self.line_ends[1] - &hp.p).dot(&hp.n)).abs();
+            //     let cos_angle = (&line_dir).dot(&hp.n);
+            //     if (d1 < r_robot || d2 < r_robot) && cos_angle.abs() > 1e-4 {
+            //         let t = &hp.n - cos_angle * line_dir;
+            //         let mut t = t.normalize();
+            //         if t.dot(&hp.n).is_sign_negative() {
+            //             t = -t;
+            //         }
+            //         hp.n = t;
+            //     }
+            // }
         }
     }
 
