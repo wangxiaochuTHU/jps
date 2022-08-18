@@ -150,7 +150,7 @@ mod tests {
 
         // use JPS the find line segments
         let mut graphsearch =
-            GraphSearch::new_v1(None, occ_set, [-50, 100], [-50, 100], [-50, 100], 1.0);
+            GraphSearch::new_v1(None, occ_set, [-10, 80], [-10, 80], [-10, 80], 1.0);
 
         let t1 = std::time::Instant::now();
         if graphsearch.plan_main(grid_start, grid_goal, true, 2000) {
@@ -196,13 +196,17 @@ mod tests {
                         local_opoints.push(*p.clone());
                     }
                 }
-                // decomp.inflate_obstacles(&mut local_opoints, r_robot); // inflate_obstacles
+                decomp.inflate_obstacles(&mut local_opoints, r_robot); // inflate_obstacles
 
                 let (k1, k2) = decomp.best_fit_ellipsoid_for_occupied_points(&local_opoints);
+                decomp.cut_into_polyhedron(local_opoints, k1, k2, r_robot);
                 decomps.push(decomp);
             }
             let t2 = std::time::Instant::now();
-            println!("find ellipsoids cost {} us", (t2 - t1).as_secs_f64() * 1e6);
+            println!(
+                "finding ellipsoids and cutting, cost time {} us",
+                (t2 - t1).as_secs_f64() * 1e6
+            );
 
             // write all ellipsoid into txt for matlab check
             let mut w = File::create("ellipsoids.txt").unwrap();
@@ -218,11 +222,11 @@ mod tests {
                 }
                 writeln!(&mut w, "{}", s).unwrap();
                 println!(
-                    "ellipsoid a,b,c = {:.3}, {:.3}, {:.3}, e0 = {:.3}",
+                    "ellipsoid a,b,c = {:.3}, {:.3}, {:.3},  polyhedron has {} hyperplanes",
                     dec.ellipsoid.a,
                     dec.ellipsoid.b,
                     dec.ellipsoid.c,
-                    dec.ellipsoid.e[(0, 0)]
+                    dec.polyhedron.len(),
                 );
             }
         } else {
@@ -238,7 +242,7 @@ mod tests {
             let mut x_rng = Uniform::new(0_f64, length);
             let mut y_rng = Uniform::new(0_f64, width);
             let mut z_rng = Uniform::new(0_f64, height);
-            for i in 0..20 {
+            for i in 0..35 {
                 let mut rng = thread_rng();
                 let center = Vec3::new(
                     x_rng.sample(&mut rng),
