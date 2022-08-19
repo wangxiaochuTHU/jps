@@ -288,9 +288,9 @@ mod tests {
 
             let x = 10.0;
             for i in -1..steps_w {
-                let y = i as f64 * steps_w as f64 * 0.15;
+                let y = i as f64 * 0.15;
                 for k in -2..steps_h {
-                    let z = k as f64 * steps_h as f64 * 0.15;
+                    let z = k as f64 * 0.15;
                     let p_b = Vec3::new(x, y, z);
                     opoints.push(p_b);
                 }
