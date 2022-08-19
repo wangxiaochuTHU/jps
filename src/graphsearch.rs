@@ -223,7 +223,7 @@ impl GraphSearch {
     ///
     /// `max_expand` : max number of the depth in searching.  
     ///
-    pub fn plan_main(
+    pub fn plan(
         &mut self,
         start: (i32, i32, i32),
         goal: (i32, i32, i32),

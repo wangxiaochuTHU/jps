@@ -5,7 +5,7 @@ pub mod decomp_tool {
     use std::hash::Hash;
 
     use itertools::Itertools;
-    use std::collections::HashSet;
+    use std::collections::{HashMap, HashSet};
     pub use yakf::kf::{self, so3::SO3, Grp3, Vec3};
     // pub use yakf::linalg::*;
     // pub const a_max: f64 = 10.0;
@@ -29,6 +29,9 @@ pub mod decomp_tool {
         pub trans: T,
         /// radius of safe flight,  r_s = v_max^2/(2*a_max)
         pub r_s: f64,
+
+        /// radius of robot
+        pub r_robot: f64,
 
         /// line is defined by two points
         pub line_ends: [Vec3; 2],
@@ -102,11 +105,32 @@ pub mod decomp_tool {
             Self {
                 trans,
                 r_s,
+                r_robot,
                 line_ends,
                 bbox,
                 ellipsoid,
                 polyhedron,
             }
+        }
+
+        pub fn decompose(
+            &mut self,
+            omap: &HashSet<(i32, i32, i32)>,
+            occ_container_map: &HashMap<(i32, i32, i32), Vec<&Vec3>>,
+        ) {
+            let grids_to_check = self.find_grids_to_check(omap);
+            let mut local_opoints: Vec<Vec3> = Vec::new();
+            for g in grids_to_check.iter() {
+                let v = occ_container_map.get(g).unwrap();
+                for p in v.iter() {
+                    local_opoints.push(*p.clone());
+                }
+            }
+            self.inflate_obstacles(&mut local_opoints, self.r_robot); // inflate_obstacles
+
+            let (k1, k2) = self.best_fit_ellipsoid_for_occupied_points(&local_opoints);
+
+            self.cut_into_polyhedron(local_opoints, k1, k2);
         }
 
         /// find which grids need to check
@@ -273,7 +297,6 @@ pub mod decomp_tool {
             mut opoints: Vec<Vec3>,
             k1: Option<usize>,
             k2: Option<usize>,
-            r_robot: f64,
         ) {
             let block = &self.ellipsoid.e + &self.ellipsoid.e.transpose();
             // add hyperplane by k1
