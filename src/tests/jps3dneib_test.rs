@@ -65,7 +65,7 @@ pub mod tests {
         // or using,  GraphSearch::new_v1(Some(free_set), occ_set, 5, 5, 5, 1.0)
         let mut graphsearch = GraphSearch::new_v1(None, occ_set, [0, 5], [0, 5], [0, 5], 1.0);
 
-        if graphsearch.plan_main(map_start, map_goal, true, 1000) {
+        if graphsearch.plan(map_start, map_goal, true, 1000) {
             let path = &graphsearch.path_;
             let turnings = &graphsearch.turnings;
             let fmt_path = path.iter().enumerate().map(|(i, x)| {
