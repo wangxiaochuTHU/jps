@@ -153,7 +153,7 @@ mod tests {
             GraphSearch::new_v1(None, occ_set, [-10, 80], [-10, 80], [-10, 80], 1.0);
 
         let t1 = std::time::Instant::now();
-        if graphsearch.plan_main(grid_start, grid_goal, true, 5000) {
+        if graphsearch.plan(grid_start, grid_goal, true, 5000) {
             let t2 = std::time::Instant::now();
             println!("path finding cost {} us", (t2 - t1).as_secs_f64() * 1e6);
             let path = &graphsearch.path_;
@@ -201,7 +201,7 @@ mod tests {
 
                 let (k1, k2) = decomp.best_fit_ellipsoid_for_occupied_points(&local_opoints);
                 ellipsoids.push(decomp.ellipsoid.clone()); // need to save the ellipsoid now, because after being cut, it will be inflated.
-                decomp.cut_into_polyhedron(local_opoints, k1, k2, r_robot);
+                decomp.cut_into_polyhedron(local_opoints, k1, k2);
                 decomps.push(decomp);
             }
             let t2 = std::time::Instant::now();
@@ -454,7 +454,7 @@ mod tests {
             "[Before cutting] polyhedron has {} hyperplanes",
             decomp2.polyhedron.len(),
         );
-        decomp2.cut_into_polyhedron(opoints, k1, k2, r_robot);
+        decomp2.cut_into_polyhedron(opoints, k1, k2);
         println!(
             "[After cutting] polyhedron has {} hyperplanes",
             decomp2.polyhedron.len(),
