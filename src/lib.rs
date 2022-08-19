@@ -8,7 +8,7 @@ pub mod base;
 pub use graphsearch::GraphSearch;
 
 #[cfg(feature = "decomp")]
-pub use decomposition::base::decomp_tool;
+pub use decomposition::base::decomp_tool::{self, Decomp, Grp3, Vec3, Voxelable};
 
 mod decomposition;
 mod graphsearch;

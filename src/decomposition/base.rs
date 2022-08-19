@@ -24,7 +24,7 @@ pub mod decomp_tool {
         }
     }
     #[derive(Debug, Clone)]
-    pub struct Decomp<T: Voxelable + Hash + Sized + Send + Clone + Copy> {
+    pub struct Decomp<T: Voxelable + Clone + Copy> {
         /// an object that can provide methods to transform physical coordinates and voxelized grids.
         pub trans: T,
         /// radius of safe flight,  r_s = v_max^2/(2*a_max)
@@ -47,7 +47,7 @@ pub mod decomp_tool {
     }
     impl<T> Decomp<T>
     where
-        T: Voxelable + Hash + Sized + Send + Clone + Copy,
+        T: Voxelable + Clone + Copy,
     {
         /// init a Decomp
         pub fn init(
@@ -134,7 +134,7 @@ pub mod decomp_tool {
         }
 
         /// find which grids need to check
-        pub fn find_grids_to_check(
+        pub(crate) fn find_grids_to_check(
             &self,
             omap: &HashSet<(i32, i32, i32)>,
         ) -> HashSet<(i32, i32, i32)> {
@@ -190,7 +190,7 @@ pub mod decomp_tool {
         /// But I feel this would not be exact for a part of the points.
         ///
         /// TODO: how to exactly and efficiently inflate? I think inflation should be done before path finding.
-        pub fn inflate_obstacles(&self, opoints: &mut Vec<Vec3>, inflate_distance: f64) {
+        pub(crate) fn inflate_obstacles(&self, opoints: &mut Vec<Vec3>, inflate_distance: f64) {
             for p in opoints.iter_mut() {
                 let dir_cp = *p - self.ellipsoid.center;
                 let dir_cp = dir_cp.normalize();
@@ -199,7 +199,7 @@ pub mod decomp_tool {
         }
 
         /// make the ellipsoid keep deforming to fit for surrounding occupied points, until finished
-        pub fn best_fit_ellipsoid_for_occupied_points(
+        pub(crate) fn best_fit_ellipsoid_for_occupied_points(
             &mut self,
             opoints: &Vec<Vec3>,
         ) -> (Option<usize>, Option<usize>) {
@@ -282,7 +282,7 @@ pub mod decomp_tool {
 
         /// check if Point p is on the same side
         #[inline]
-        pub fn is_at_inner_side(p: &Vec3, polys: &Vec<HyperPlane>) -> bool {
+        pub(crate) fn is_at_inner_side(p: &Vec3, polys: &Vec<HyperPlane>) -> bool {
             for hp in polys.iter() {
                 if hp.n.dot(&(p - &hp.p)) >= -1e-4 {
                     return false;
@@ -292,7 +292,7 @@ pub mod decomp_tool {
         }
 
         /// cut the space surrounding the ellipsoid
-        pub fn cut_into_polyhedron(
+        pub(crate) fn cut_into_polyhedron(
             &mut self,
             mut opoints: Vec<Vec3>,
             k1: Option<usize>,
@@ -381,7 +381,7 @@ pub mod decomp_tool {
     }
     impl Ellipsoid {
         /// shrink two axes (b,c) simultaneously, such that Point p is on the surface of the ellipsoid.
-        pub fn shrink_two_axes_by_point(&mut self, p: &Vec3) {
+        pub(crate) fn shrink_two_axes_by_point(&mut self, p: &Vec3) {
             let s0 = 1.0 / self.a.powi(2);
             let y = self.r.transpose() * (p - &self.center);
             let s_1_2 = (1.0 - y[0].powi(2) * s0) / (y[1].powi(2) + y[2].powi(2));
@@ -394,7 +394,7 @@ pub mod decomp_tool {
         }
 
         /// assign a new axis direction for the z-axis, and reset the z-axis equal to `a`.
-        pub fn reset_two_axes(&mut self, n3: Vec3, p: &Vec3) {
+        pub(crate) fn reset_two_axes(&mut self, n3: Vec3, p: &Vec3) {
             // println!("-------r = {:.4?}", self.r);
             // let y = self.r.transpose() * (p - &self.center);
             let n1 = &self.r.index((0..3, 0));
@@ -444,7 +444,7 @@ pub mod decomp_tool {
         }
 
         /// shrink z-axis (c), such that Point p is on the surface of the ellipsoid.
-        pub fn shrink_one_axes_by_point(&mut self, p: &Vec3) {
+        pub(crate) fn shrink_one_axes_by_point(&mut self, p: &Vec3) {
             let s0 = 1.0 / self.a.powi(2);
             let s1 = 1.0 / self.b.powi(2);
             let y = self.r.transpose() * (p - &self.center);
@@ -473,7 +473,7 @@ pub mod decomp_tool {
         }
 
         /// dilate all three axes (a,b,c), such that Point p is on the surface of the ellipsoid.
-        pub fn dilate_by_point(&mut self, p: &Vec3) {
+        pub(crate) fn dilate_by_point(&mut self, p: &Vec3) {
             let s0 = 1.0 / self.a.powi(2);
             let s1 = 1.0 / self.b.powi(2);
             let s2 = 1.0 / self.c.powi(2);
@@ -488,7 +488,7 @@ pub mod decomp_tool {
         }
 
         /// check whether Point p is inside the ellipsoid
-        pub fn contains(&self, p: &Vec3) -> bool {
+        pub(crate) fn contains(&self, p: &Vec3) -> bool {
             if self.distance(p) < 0.9999 {
                 true
             } else {
@@ -496,7 +496,7 @@ pub mod decomp_tool {
             }
         }
         #[inline]
-        pub fn distance(&self, p: &Vec3) -> f64 {
+        pub(crate) fn distance(&self, p: &Vec3) -> f64 {
             let dp = p - &self.center;
             let d = dp.transpose() * &self.e * &dp;
             d[0].abs()
@@ -516,7 +516,7 @@ pub mod decomp_tool {
         pub vertices: [Vec3; 8],
     }
     impl BoundingBox {
-        pub fn is_point_inside_bbox(&self, x: &Vec3) -> bool {
+        pub(crate) fn is_point_inside_bbox(&self, x: &Vec3) -> bool {
             for plane in self.hplanes.iter() {
                 if (x - &plane.p).dot(&plane.n) >= 0.0 {
                     return false;
@@ -531,13 +531,13 @@ pub mod decomp_tool {
         pub p: Vec3,
     }
     impl HyperPlane {
-        pub fn new(n: Vec3, p: Vec3) -> Self {
+        pub(crate) fn new(n: Vec3, p: Vec3) -> Self {
             Self { n, p }
         }
     }
 
     /// x-axis is parallel to the line
-    pub fn find_bbox_dir_x(l: &Vec3) -> Vec3 {
+    pub(crate) fn find_bbox_dir_x(l: &Vec3) -> Vec3 {
         let mut n1 = l.clone();
         n1 = n1.normalize();
 
@@ -545,7 +545,7 @@ pub mod decomp_tool {
     }
 
     ///  y-axis is perpendicular to the line and world z-axis
-    pub fn find_bbox_dir_y(n1: &Vec3) -> Vec3 {
+    pub(crate) fn find_bbox_dir_y(n1: &Vec3) -> Vec3 {
         let wd_z = Vec3::new(0.0, 0.0, 1.0);
 
         // if n1 is parallel to world z-axis, choose world y-axis as the y-axis
@@ -557,11 +557,11 @@ pub mod decomp_tool {
     }
 
     /// z-axis is perpendiculat to the line and y-axis
-    pub fn find_bbox_dir_z(n1: &Vec3, n2: &Vec3) -> Vec3 {
+    pub(crate) fn find_bbox_dir_z(n1: &Vec3, n2: &Vec3) -> Vec3 {
         n1.cross(&n2)
     }
 
-    pub fn find_perpendicular_direction(n1: &Vec3) -> Vec3 {
+    pub(crate) fn find_perpendicular_direction(n1: &Vec3) -> Vec3 {
         // let x = n1;
         // let x = n1.abs();
         // find a coordinate i-th whose value is not 0
@@ -577,11 +577,11 @@ pub mod decomp_tool {
         // return
         n2
     }
-    pub fn find_third_direction(n1: &Vec3, n2: &Vec3) -> Vec3 {
+    pub(crate) fn find_third_direction(n1: &Vec3, n2: &Vec3) -> Vec3 {
         // n1 × n2, input should be unit vectors.
         n1.cross(n2)
     }
-    pub fn get_attitude_from_one_vector(n1: &Vec3) -> Grp3 {
+    pub(crate) fn get_attitude_from_one_vector(n1: &Vec3) -> Grp3 {
         let n2 = find_perpendicular_direction(n1);
         let n3 = find_third_direction(n1, &n2);
         let attitude_matrix = Grp3::from_columns(&[*n1, n2, n3]);
