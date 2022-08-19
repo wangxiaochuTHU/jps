@@ -204,9 +204,9 @@ pub mod decomp_tool {
             }
             /* step 2: reset the two axes of the ellipsoid*/
             match k1 {
-                // None means there is no intersected point. in this case, the ellipsoid needs no more adjustments.
+                // None means there is no intersect point. in this case, the ellipsoid needs no more adjustments.
                 None => return (k1, k2),
-                // if intersected point exists, reset and find a next intersected point.
+                // if intersect point exists, reset and find a next intersect point.
                 Some(kk1) => {
                     // find direction n3
                     let op = &opoints[kk1] - &self.ellipsoid.center;
