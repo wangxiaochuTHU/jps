@@ -59,29 +59,29 @@ pub mod decomp_tool {
             let d = r_s + r_robot;
             let center = 0.5 * (&p1 + &p2);
             let line = &p2 - &p1;
-            let a = line.norm();
+            let a = line.norm() / 2.0;
             let b = a;
             let c = a;
             let n1 = find_bbox_dir_x(&line);
             let n2 = find_bbox_dir_y(&n1);
             let n3 = find_bbox_dir_z(&n1, &n2);
             let hplanes: [HyperPlane; 6] = [
-                HyperPlane::new(n1, &center + &n1 * (0.5 * a + d)),
-                HyperPlane::new(-n1, &center - &n1 * (0.5 * a + d)),
+                HyperPlane::new(n1, &center + &n1 * (a + d)),
+                HyperPlane::new(-n1, &center - &n1 * (a + d)),
                 HyperPlane::new(n2, &center + &n2 * d),
                 HyperPlane::new(-n2, &center - &n2 * d),
                 HyperPlane::new(n3, &center + &n3 * d),
                 HyperPlane::new(-n3, &center - &n3 * d),
             ];
             let vertices: [Vec3; 8] = [
-                &center + &n1 * (0.5 * a + d) + &n2 * d + &n3 * d,
-                &center + &n1 * (0.5 * a + d) + &n2 * d - &n3 * d,
-                &center + &n1 * (0.5 * a + d) - &n2 * d + &n3 * d,
-                &center + &n1 * (0.5 * a + d) - &n2 * d - &n3 * d,
-                &center - &n1 * (0.5 * a + d) + &n2 * d + &n3 * d,
-                &center - &n1 * (0.5 * a + d) + &n2 * d - &n3 * d,
-                &center - &n1 * (0.5 * a + d) - &n2 * d + &n3 * d,
-                &center - &n1 * (0.5 * a + d) - &n2 * d - &n3 * d,
+                &center + &n1 * (a + d) + &n2 * d + &n3 * d,
+                &center + &n1 * (a + d) + &n2 * d - &n3 * d,
+                &center + &n1 * (a + d) - &n2 * d + &n3 * d,
+                &center + &n1 * (a + d) - &n2 * d - &n3 * d,
+                &center - &n1 * (a + d) + &n2 * d + &n3 * d,
+                &center - &n1 * (a + d) + &n2 * d - &n3 * d,
+                &center - &n1 * (a + d) - &n2 * d + &n3 * d,
+                &center - &n1 * (a + d) - &n2 * d - &n3 * d,
             ];
             let bbox = BoundingBox { hplanes, vertices };
             let r = Grp3::from_columns(&[n1, n2, n3]);
@@ -97,6 +97,7 @@ pub mod decomp_tool {
                 e,
             };
             let line_ends = [p1, p2];
+
             let polyhedron: Vec<HyperPlane> = Vec::new();
             Self {
                 trans,
@@ -212,8 +213,23 @@ pub mod decomp_tool {
                     let op = op.normalize();
                     let n1 = &self.ellipsoid.r.index((0..3, 0));
                     let n3 = n1.cross(&op);
+
+                    // // test reset
+                    // println!(
+                    //     "----------------- d1 = {}, d2 = {}",
+                    //     self.ellipsoid.distance(&self.line_ends[0]),
+                    //     self.ellipsoid.distance(&self.line_ends[1])
+                    // );
+
                     // reset
                     self.ellipsoid.reset_two_axes(n3, &opoints[kk1]);
+
+                    // // test reset
+                    // println!(
+                    //     "++++++++++++++++++ d1 = {}, d2 = {}",
+                    //     self.ellipsoid.distance(&self.line_ends[0]),
+                    //     self.ellipsoid.distance(&self.line_ends[1])
+                    // );
                 }
             }
 
@@ -362,6 +378,7 @@ pub mod decomp_tool {
             let n2 = n3.cross(n1);
             self.r.index_mut((0..3, 1)).copy_from(&n2);
             self.r.index_mut((0..3, 2)).copy_from(&n3);
+
             let z = self.r.transpose() * (p - &self.center);
 
             let s_1_2 = (1.0 - z[0].powi(2) / self.a.powi(2)) / (z[1].powi(2) + z[2].powi(2));

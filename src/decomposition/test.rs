@@ -67,7 +67,7 @@ mod tests {
         use crate::base::JPS3DNeib;
         use crate::graphsearch::GraphSearch;
         use std::collections::{HashMap, HashSet};
-        let opoints = generate_simple_world_map(24.0, 24.0, 6.0);
+        let opoints = generate_simple_world_map(24.0, 24.0, 4.0);
         println!("opoints contains {} points", opoints.len());
         use std::fs::File;
         use std::io::Write;
@@ -136,7 +136,7 @@ mod tests {
 
         'loop2: for x in 50..60 {
             for y in 52..60 {
-                for z in 4..8 {
+                for z in -1..1 {
                     if !occ_set.contains(&(x, y, z)) {
                         grid_goal = (x, y, z);
                         break 'loop2;
@@ -153,7 +153,7 @@ mod tests {
             GraphSearch::new_v1(None, occ_set, [-10, 80], [-10, 80], [-10, 80], 1.0);
 
         let t1 = std::time::Instant::now();
-        if graphsearch.plan_main(grid_start, grid_goal, true, 2000) {
+        if graphsearch.plan_main(grid_start, grid_goal, true, 5000) {
             let t2 = std::time::Instant::now();
             println!("path finding cost {} us", (t2 - t1).as_secs_f64() * 1e6);
             let path = &graphsearch.path_;
@@ -182,6 +182,7 @@ mod tests {
 
             // decomposition
             let mut decomps: Vec<Decomp<Transformer>> = Vec::new();
+            let mut ellipsoids: Vec<Ellipsoid> = Vec::new();
 
             let t1 = std::time::Instant::now();
             for k in 1..turnings.len() {
@@ -199,6 +200,7 @@ mod tests {
                 decomp.inflate_obstacles(&mut local_opoints, r_robot); // inflate_obstacles
 
                 let (k1, k2) = decomp.best_fit_ellipsoid_for_occupied_points(&local_opoints);
+                ellipsoids.push(decomp.ellipsoid.clone()); // need to save the ellipsoid now, because after being cut, it will be inflated.
                 decomp.cut_into_polyhedron(local_opoints, k1, k2, r_robot);
                 decomps.push(decomp);
             }
@@ -210,9 +212,9 @@ mod tests {
 
             // write all ellipsoid into txt for matlab check
             let mut w = File::create("ellipsoids.txt").unwrap();
-            for dec in decomps.iter() {
-                let ellip_center = dec.ellipsoid.center;
-                let ellip_e = dec.ellipsoid.e.reshape_generic(Const::<9>, Const::<1>);
+            for (ellip, dec) in ellipsoids.iter().zip(decomps.iter()) {
+                let ellip_center = ellip.center;
+                let ellip_e = ellip.e.reshape_generic(Const::<9>, Const::<1>);
                 let mut s = String::new();
                 for i in 0..3 {
                     s += format!("{},", ellip_center[i]).as_str();
@@ -220,14 +222,25 @@ mod tests {
                 for i in 0..9 {
                     s += format!("{},", ellip_e[i]).as_str();
                 }
+                s += format!("{},", ellip.a).as_str();
+                s += format!("{},", ellip.b).as_str();
+                s += format!("{}", ellip.c).as_str();
                 writeln!(&mut w, "{}", s).unwrap();
                 println!(
                     "ellipsoid a,b,c = {:.3}, {:.3}, {:.3},  polyhedron has {} hyperplanes",
-                    dec.ellipsoid.a,
-                    dec.ellipsoid.b,
-                    dec.ellipsoid.c,
+                    ellip.a,
+                    ellip.b,
+                    ellip.c,
                     dec.polyhedron.len(),
                 );
+                let e1 = dec.line_ends[0];
+                let e2 = dec.line_ends[1];
+                let ye1 = ellip.distance(&e1);
+                let ye2 = ellip.distance(&e2);
+                println!("ye1 = {:.4}, ye2 = {:.4}", ye1, ye2);
+                if (ye1 - 1.0).abs() > 0.01 || (ye2 - 1.0).abs() > 0.01 {
+                    assert!(1 == 2);
+                }
             }
         } else {
             println!("path finding failed");
@@ -253,29 +266,48 @@ mod tests {
                 let attitude = SO3::from_vec(v).to_grp();
                 match rng.gen_bool(0.5) {
                     true => {
-                        let r = rng.gen_range(length / 40.0..length / 30.0);
+                        let r = rng.gen_range(length / 25.0..length / 20.0);
                         let h = rng.gen_range(height / 20.0..height / 10.0);
                         let mut ops = make_obstacles_in_cylinder(center, r, h, 0.15, attitude);
                         opoints.append(&mut ops)
                     }
                     false => {
-                        let a = rng.gen_range(length / 40.0..length / 25.0);
-                        let b = rng.gen_range(width / 20.0..width / 10.0);
-                        let c = rng.gen_range(height / 20.0..height / 10.0);
+                        let a = rng.gen_range(length / 30.0..length / 25.0);
+                        let b = rng.gen_range(width / 20.0..width / 15.0);
+                        let c = rng.gen_range(height / 10.0..height / 5.0);
                         let mut ops = make_obstacles_in_cuboid(center, a, b, c, 0.15, attitude);
                         opoints.append(&mut ops)
                     }
                 }
             }
+
+            // let mut opoints: Vec<Vec3> = Vec::new();
+
+            let steps_w = (width / 0.15 * 0.8).floor() as i32;
+            let steps_h = (height / 0.15).floor() as i32;
+
+            let x = 10.0;
+            for i in -1..steps_w {
+                let y = i as f64 * steps_w as f64 * 0.15;
+                for k in -2..steps_h {
+                    let z = k as f64 * steps_h as f64 * 0.15;
+                    let p_b = Vec3::new(x, y, z);
+                    opoints.push(p_b);
+                }
+            }
+
             opoints
         }
     }
 
     use std::f64::consts::PI;
 
-    use crate::decomposition::base::decomp_tool::{
-        self, find_perpendicular_direction, find_third_direction, get_attitude_from_one_vector,
-        Grp3, Vec3,
+    use crate::{
+        decomp_tool::Ellipsoid,
+        decomposition::base::decomp_tool::{
+            self, find_perpendicular_direction, find_third_direction, get_attitude_from_one_vector,
+            Grp3, Vec3,
+        },
     };
 
     #[test]
